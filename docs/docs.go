@@ -15,6 +15,113 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/tenant": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Busca um tenant no sistema usando o UUID ou o Documento (CNPJ/CPF). Pelo menos um dos dois campos deve ser fornecido.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant"
+                ],
+                "summary": "Busca um Tenant",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID do tenant a ser buscado. (Ex: 8871abf3-ed11-4770-b986-e8d98d022d4f)",
+                        "name": "uuid",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Documento (CNPJ/CPF) do tenant a ser buscado. (Ex: 12345678901234)",
+                        "name": "document",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tenant encontrado com sucesso.",
+                        "schema": {
+                            "$ref": "#/definitions/tenant.TenantResponseDto"
+                        }
+                    },
+                    "400": {
+                        "description": "Requisição inválida (UUID inválido, ou nenhum dos campos 'uuid'/'document' fornecido).",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "404": {
+                        "description": "Tenant não encontrado com os dados fornecidos.",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno do servidor.",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Exclui permanentemente um tenant no sistema usando o UUID ou o Documento (CNPJ/CPF). Pelo menos um dos dois campos deve ser fornecido.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant"
+                ],
+                "summary": "Deleta um Tenant",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID do tenant a ser excluído. (Ex: 8871abf3-ed11-4770-b986-e8d98d022d4f)",
+                        "name": "uuid",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Documento (CNPJ/CPF) do tenant a ser excluído. (Ex: 12345678901234)",
+                        "name": "document",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Tenant excluído com sucesso (No Content).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Requisição inválida (UUID inválido, ou nenhum dos campos 'uuid'/'document' fornecido).",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "404": {
+                        "description": "Tenant não encontrado com os dados fornecidos.",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno do servidor.",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    }
+                }
+            }
+        },
         "/api/tenant/create": {
             "post": {
                 "description": "Cria um novo tenant no sistema",
@@ -25,7 +132,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "tenant"
+                    "Tenant"
                 ],
                 "summary": "Cria um novo tenant",
                 "parameters": [
@@ -35,7 +142,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/tenant.CreateTenantRequest"
+                            "$ref": "#/definitions/tenant.CreateTenantRequestDto"
                         }
                     }
                 ],
@@ -43,7 +150,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/tenant.TenantResponse"
+                            "$ref": "#/definitions/tenant.TenantResponseDto"
                         }
                     },
                     "400": {
@@ -62,10 +169,161 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/tenant/list": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retorna uma lista paginada de todos os tenants registrados no sistema.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant"
+                ],
+                "summary": "Lista Tenants",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "O número da página a ser retornada (deve ser \u003e= 1).",
+                        "name": "page",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "O número de itens por página (máximo 100).",
+                        "name": "pageSize",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista de tenants retornada com sucesso.",
+                        "schema": {
+                            "$ref": "#/definitions/tenant.TenantsResponseDto"
+                        }
+                    },
+                    "400": {
+                        "description": "Requisição inválida (parâmetros de paginação ausentes ou inválidos, ou pageSize \u003e 100).",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno do servidor.",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/tenant/{uuid}": {
+            "patch": {
+                "description": "Atualiza dados de um tenant existente. O tenant a ser atualizado é identificado pelo UUID no path",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tenant"
+                ],
+                "summary": "Atualiza um Tenant",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID do tenant a ser atualizado.",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Campos do tenant a serem atualizados. Apenas os campos presentes serão modificados.",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/tenant.UpdateTenantRequestDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tenant atualizado com sucesso.",
+                        "schema": {
+                            "$ref": "#/definitions/tenant.TenantResponseDto"
+                        }
+                    },
+                    "400": {
+                        "description": "Requisição inválida (corpo JSON mal formatado, UUID inválido ou dados de entrada inválidos).",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "404": {
+                        "description": "Tenant não encontrado para o UUID fornecido.",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflito (o novo 'document' fornecido já está em uso por outro tenant).",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno do servidor.",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
-        "tenant.CreateTenantRequest": {
+        "rest_err.Causes": {
+            "type": "object",
+            "properties": {
+                "field": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest_err.RestErr": {
+            "type": "object",
+            "properties": {
+                "causes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest_err.Causes"
+                    }
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "tenant.CreateTenantRequestDto": {
             "type": "object",
             "required": [
                 "document",
@@ -80,9 +338,12 @@ const docTemplate = `{
                 }
             }
         },
-        "tenant.TenantResponse": {
+        "tenant.TenantResponseDto": {
             "type": "object",
             "properties": {
+                "createAt": {
+                    "type": "string"
+                },
                 "document": {
                     "type": "string"
                 },
@@ -92,7 +353,41 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "updateAt": {
+                    "type": "string"
+                },
                 "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "tenant.TenantsResponseDto": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "tenants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tenant.TenantResponseDto"
+                    }
+                }
+            }
+        },
+        "tenant.UpdateTenantRequestDto": {
+            "type": "object",
+            "properties": {
+                "document": {
+                    "type": "string"
+                },
+                "live": {
+                    "type": "boolean"
+                },
+                "name": {
                     "type": "string"
                 }
             }

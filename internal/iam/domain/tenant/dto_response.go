@@ -1,21 +1,23 @@
 package tenant
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // TenantResponse representa a resposta com os dados de um tenant
-type TenantResponse struct {
+type TenantResponseDto struct {
 	UUID     uuid.UUID `json:"uuid"`
 	Name     string    `json:"name"`
 	Document string    `json:"document"`
 	Live     bool      `json:"live"`
+	CreateAt time.Time `json:"createAt"`
+	UpdateAt time.Time `json:"updateAt"`
 }
 
-// ToResponse converte um Tenant para TenantResponse
-func ToResponse(tenant Tenant) TenantResponse {
-	return TenantResponse{
-		UUID:     tenant.UUID,
-		Name:     tenant.Name,
-		Document: tenant.Document,
-		Live:     tenant.Live,
-	}
+type TenantsResponseDto struct {
+	Tenants []TenantResponseDto `json:"tenants"`
+	Page    int                 `json:"page"`
+	Size    int                 `json:"size"`
 }
