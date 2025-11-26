@@ -1,0 +1,42 @@
+{
+  "app": {
+    "env": "prod",
+    "name": "crud-tenant-simply"
+  },
+    "test":{
+      "ngrok": {
+        "live": false,
+        "token": "token_ngrok"
+      }
+    },
+  "security": {
+    "jwt_access_secret": "SEU_SEGREDO_DE_ACESSO_AQUI",
+    "jwt_refresh_secret": "SEU_SEGREDO_DE_REFRESH_AQUI",
+    "jwt_access_expiry_min": 15
+  },
+  "server": {
+    "http": {
+      "port": "8080"
+    }
+  },
+  "databases": {
+    "postgres": {
+      "host": "127.0.0.1",
+      "port": 5432,
+      "user": "admin",
+      "pwd": "p4ssW0rd",
+      "db_name": "db_Base",
+      "ssl_mode": "disable"
+    }
+  },
+  "smtp": {
+    "mailer": "smtp",
+    "host": "smtp.office365.com",
+    "port": "587",
+    "username": "no-reply@test.com.br",
+    "password": "pwdTest",
+    "encryption": "tls",
+    "address": "no-reply@test.com.br"
+  },
+  "environment": "dev"
+}
