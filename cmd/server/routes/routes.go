@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"os"
+	"tenant-crud-simply/internal/iam/domain/tenant"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
@@ -30,8 +31,18 @@ func SetupRouter() *gin.Engine {
 
 	r := gin.Default()
 
-	// Acessível em http://localhost:8080/doc/index.html
+	// Acessível em /doc/index.html
 	r.GET("/doc/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
+	SetupApiRoutes(r)
 	return r
+}
+
+func SetupApiRoutes(r *gin.Engine) {
+	route := r.Group("/api")
+
+	tenantController, err := tenant.Use()
+	if err != nil {
+		panic(err)
+	}
+	tenantController.Routes(route)
 }

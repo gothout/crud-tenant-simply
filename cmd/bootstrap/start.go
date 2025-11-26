@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"tenant-crud-simply/internal/iam/domain/tenant"
 	"tenant-crud-simply/internal/infra/jwt"
 	"tenant-crud-simply/internal/pkg/mailer"
 	"time"
 
-	"github.com/spf13/viper"
-	"golang.ngrok.com/ngrok/v2"
 	"tenant-crud-simply/cmd/server"
 	"tenant-crud-simply/internal/infra/database/postgres"
+
+	"github.com/spf13/viper"
+	"golang.ngrok.com/ngrok/v2"
+	"gorm.io/gorm"
 )
 
 // Application armazena as dependências centrais da aplicação.
@@ -29,6 +32,10 @@ func Environment() {
 	if err != nil {
 		panic(fmt.Errorf("fatal error in configuration file: %w", err))
 	}
+}
+
+func initIamDomain(db *gorm.DB) {
+	tenant.New(db)
 }
 
 // New prepara a aplicação (config, db, di) e retorna a instância.
@@ -58,9 +65,9 @@ func New() (*Application, error) {
 		log.Println("[BOOTSTRAP-MAILER] Falha ao iniciar sistema de emails")
 	}
 	log.Println("[BOOTSTRAP-MAILER] Sucesso ao iniciar sistema de emails")
-	_ = postgres.InitPostgres()
+	db := postgres.InitPostgres()
 	log.Println("[BOOTSTRAP-DATABASE] Conexão com o banco de dados inicializada.")
-
+	initIamDomain(db)
 	log.Println("[BOOTSTRAP-DI] Contêiner de dependências inicializado.")
 
 	return &Application{
