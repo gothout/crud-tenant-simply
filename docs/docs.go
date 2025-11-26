@@ -289,6 +289,71 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/user/{identifier}": {
+            "post": {
+                "description": "Registra um novo usuário no sistema, associado a um tenant (empresa/organização).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Cria um novo Usuário",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Identificador (UUID ou Documento) do Tenant ao qual o usuário será associado.",
+                        "name": "identifier",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Objeto do usuário que precisa ser criado.",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.CreateUserRequestDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Usuário criado com sucesso.",
+                        "schema": {
+                            "$ref": "#/definitions/user.UserResponseDto"
+                        }
+                    },
+                    "400": {
+                        "description": "Requisição inválida (corpo JSON mal formatado, dados de entrada inválidos, ou 'identifier' do tenant ausente).",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "404": {
+                        "description": "Tenant não encontrado (o 'identifier' fornecido não corresponde a nenhum tenant existente).",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflito (o 'email' fornecido já está em uso).",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "500": {
+                        "description": "Erro interno do servidor.",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -391,6 +456,72 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "user.CreateUserRequestDto": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "password",
+                "role"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "role": {
+                    "$ref": "#/definitions/user.UserRole"
+                }
+            }
+        },
+        "user.UserResponseDto": {
+            "type": "object",
+            "properties": {
+                "create_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "live": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "role": {
+                    "$ref": "#/definitions/user.UserRole"
+                },
+                "tenant_uuid": {
+                    "type": "string"
+                },
+                "update_at": {
+                    "type": "string"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.UserRole": {
+            "type": "string",
+            "enum": [
+                "SYSTEM_ADMIN",
+                "TENANT_ADMIN",
+                "TENANT_USER"
+            ],
+            "x-enum-varnames": [
+                "RoleSystemAdmin",
+                "RoleTenantAdmin",
+                "RoleTenantUser"
+            ]
         }
     },
     "securityDefinitions": {

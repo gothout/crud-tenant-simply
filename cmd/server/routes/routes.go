@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"tenant-crud-simply/internal/iam/domain/tenant"
+	"tenant-crud-simply/internal/iam/domain/user"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
@@ -44,5 +45,10 @@ func SetupApiRoutes(r *gin.Engine) {
 	if err != nil {
 		panic(err)
 	}
+	userController, err := user.Use()
+	if err != nil {
+		panic(err)
+	}
 	tenantController.Routes(route)
+	userController.Routes(route)
 }
