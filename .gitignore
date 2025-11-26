@@ -37,6 +37,7 @@ logs/*
 
 # Editor/IDE
 .idea/
+.agent/
 vscode/
 
 # Arquivos de backup criados pelo script de rename

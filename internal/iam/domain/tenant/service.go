@@ -1,6 +1,8 @@
 package tenant
 
-import "context"
+import (
+	"context"
+)
 
 type Service interface {
 	Create(ctx context.Context, tenant Tenant) (Tenant, error)

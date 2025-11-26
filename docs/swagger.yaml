@@ -81,6 +81,17 @@ definitions:
     - password
     - role
     type: object
+  user.UpdateUserRequestDto:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      role:
+        $ref: '#/definitions/user.UserRole'
+    type: object
   user.UserResponseDto:
     properties:
       create_at:
@@ -302,7 +313,117 @@ paths:
       summary: Lista Tenants
       tags:
       - Tenant
+  /api/user:
+    delete:
+      description: Exclui permanentemente um usuário no sistema usando o UUID ou o
+        Email.
+      parameters:
+      - description: UUID do usuário
+        in: query
+        name: uuid
+        type: string
+      - description: Email do usuário
+        in: query
+        name: email
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+      summary: Deleta um Usuário
+      tags:
+      - User
+    get:
+      description: Busca um usuário no sistema usando o UUID ou o Email. Pelo menos
+        um dos dois campos deve ser fornecido.
+      parameters:
+      - description: UUID do usuário
+        in: query
+        name: uuid
+        type: string
+      - description: Email do usuário
+        in: query
+        name: email
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.UserResponseDto'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+      summary: Busca um Usuário
+      tags:
+      - User
   /api/user/{identifier}:
+    patch:
+      consumes:
+      - application/json
+      description: Atualiza dados de um usuário existente. O usuário a ser atualizado
+        é identificado pelo UUID no path.
+      parameters:
+      - description: Idenficador do usuário
+        in: path
+        name: identifier
+        required: true
+        type: string
+      - description: Dados para atualização
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.UpdateUserRequestDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.UserResponseDto'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+      summary: Atualiza um Usuário
+      tags:
+      - User
     post:
       consumes:
       - application/json
@@ -346,6 +467,35 @@ paths:
           schema:
             $ref: '#/definitions/rest_err.RestErr'
       summary: Cria um novo Usuário
+      tags:
+      - User
+  /api/user/list:
+    get:
+      description: Retorna uma lista paginada de todos os usuários registrados no
+        sistema.
+      parameters:
+      - description: Número da página (padrão 1)
+        in: query
+        name: page
+        type: integer
+      - description: Tamanho da página (padrão 10)
+        in: query
+        name: size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/user.UserResponseDto'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+      summary: Lista Usuários
       tags:
       - User
 securityDefinitions:
