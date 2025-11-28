@@ -353,7 +353,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/tenant/create-blocked": {
+        "/api/tenant/create": {
             "post": {
                 "description": "Cria um novo tenant no sistema",
                 "consumes": [

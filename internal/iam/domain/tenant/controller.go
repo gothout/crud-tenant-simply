@@ -54,7 +54,7 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter, authMiddleware gin.Handle
 // @Success 201 {object} TenantResponseDto
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /api/tenant/create-blocked [post]
+// @Router /api/tenant/create [post]
 func (ctrl *controllerImpl) Create(c *gin.Context) {
 	var req CreateTenantRequestDto
 

@@ -435,7 +435,7 @@ paths:
       summary: Atualiza um Tenant
       tags:
       - Tenant
-  /api/tenant/create-blocked:
+  /api/tenant/create:
     post:
       consumes:
       - application/json
