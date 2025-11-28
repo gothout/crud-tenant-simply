@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"tenant-crud-simply/internal/iam/application/auth"
 	"tenant-crud-simply/internal/iam/domain/tenant"
 	"tenant-crud-simply/internal/iam/domain/user"
+	"tenant-crud-simply/internal/iam/middleware"
 	"tenant-crud-simply/internal/infra/jwt"
 	"tenant-crud-simply/internal/pkg/mailer"
 	"time"
@@ -38,6 +40,8 @@ func Environment() {
 func initIamDomain(db *gorm.DB) {
 	tenant.New(db)
 	user.New(db)
+	middleware.New(db)
+	auth.New(db)
 }
 
 // New prepara a aplicação (config, db, di) e retorna a instância.
@@ -65,8 +69,9 @@ func New() (*Application, error) {
 	_, err = mailer.New(mailerCfg)
 	if err != nil {
 		log.Println("[BOOTSTRAP-MAILER] Falha ao iniciar sistema de emails")
+	} else {
+		log.Println("[BOOTSTRAP-MAILER] Sucesso ao iniciar sistema de emails")
 	}
-	log.Println("[BOOTSTRAP-MAILER] Sucesso ao iniciar sistema de emails")
 	db := postgres.InitPostgres()
 	log.Println("[BOOTSTRAP-DATABASE] Conexão com o banco de dados inicializada.")
 	initIamDomain(db)

@@ -11,7 +11,7 @@ import (
 
 // Controller interface define os métodos do controller de tenant
 type Controller interface {
-	Routes(routes gin.IRouter)
+	Routes(routes gin.IRouter, authMiddleware gin.HandlerFunc)
 	Create(c *gin.Context)
 	Read(c *gin.Context)
 	List(c *gin.Context)
@@ -32,10 +32,11 @@ func NewController(service Service) Controller {
 }
 
 // Routes registra as rotas do tenant
-func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
+func (ctrl *controllerImpl) Routes(routes gin.IRouter, authMiddleware gin.HandlerFunc) {
 	tenantGroup := routes.Group("/tenant")
 	{
 		tenantGroup.POST("/create", ctrl.Create)
+		tenantGroup.POST("/create-blocked", authMiddleware, ctrl.Create)
 		tenantGroup.GET("", ctrl.Read)
 		tenantGroup.GET("/list", ctrl.List)
 		tenantGroup.PATCH("/:uuid", ctrl.Update)
@@ -53,7 +54,7 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 // @Success 201 {object} TenantResponseDto
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
-// @Router /api/tenant/create [post]
+// @Router /api/tenant/create-blocked [post]
 func (ctrl *controllerImpl) Create(c *gin.Context) {
 	var req CreateTenantRequestDto
 

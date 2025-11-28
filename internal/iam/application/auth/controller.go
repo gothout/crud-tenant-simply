@@ -1,0 +1,208 @@
+package auth
+
+import (
+	"errors"
+	"net/http"
+	"tenant-crud-simply/internal/iam/domain/user"
+	"tenant-crud-simply/internal/pkg/mailer"
+	"tenant-crud-simply/internal/pkg/rest_err"
+
+	"github.com/gin-gonic/gin"
+)
+
+type Controller interface {
+	Routes(routes gin.IRouter)
+	Login(c *gin.Context)
+	Logout(c *gin.Context)
+	CreateOTP(c *gin.Context)
+	ResetPassword(c *gin.Context)
+}
+
+type controllerImpl struct {
+	Service Service
+}
+
+func NewController(Service Service) Controller {
+	return &controllerImpl{
+		Service: Service,
+	}
+}
+
+// Routes registra as rotas do tenant
+func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
+	authGroup := routes.Group("/auth")
+	{
+		authGroup.POST("/login", ctrl.Login)
+		authGroup.POST("/logout/:token", ctrl.Logout)
+		authGroup.POST("/otp", ctrl.CreateOTP)
+		authGroup.POST("/password/reset", ctrl.ResetPassword)
+	}
+}
+
+// @Summary Efetua o login do usuário
+// @Description Recebe email e senha, autentica o usuário e retorna o token de acesso.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "Credenciais do Usuário (Email e Senha)"
+// @Success 200 {object} LoginResponse "Login bem-sucedido"
+// @Failure 400 {object} rest_err.RestErr "Requisição inválida (JSON mal formatado)"
+// @Failure 404 {object} rest_err.RestErr "Credenciais inválidas (usuário/senha errados)"
+// @Failure 409 {object} rest_err.RestErr "Token duplicado ou conflito"
+// @Failure 500 {object} rest_err.RestErr "Erro interno do servidor"
+// @Router /api/auth/login [post]
+func (ctrl *controllerImpl) Login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		restErr := rest_err.NewBadRequestError("invalid json body")
+		c.JSON(restErr.Code, restErr)
+		return
+	}
+
+	uLogin, err := ctrl.Service.Login(c.Request.Context(), req.Email, req.Password)
+	if err != nil {
+		var restError *rest_err.RestErr
+		switch {
+		case errors.Is(err, ErrPwdWrong):
+			restError = rest_err.NewNotFoundError(err.Error())
+
+		case errors.Is(err, ErrTokenDuplicated):
+			restError = rest_err.NewConflictValidationError(err.Error(), nil)
+
+		default:
+			restError = rest_err.NewInternalServerError("internal server error", nil)
+		}
+
+		c.JSON(restError.Code, restError)
+		return
+	}
+
+	response := LoginResponse{
+		User: user.UserResponseDto{
+			UUID:       uLogin.User.UUID,
+			TenantUUID: uLogin.User.TenantUUID,
+			Name:       uLogin.User.Name,
+			Email:      uLogin.User.Email,
+			Role:       uLogin.User.Role,
+			Live:       uLogin.User.Live,
+			CreateAt:   uLogin.User.CreateAt,
+			UpdateAt:   uLogin.User.UpdateAt,
+		},
+		Token:  uLogin.AcessToken.Token,
+		Expire: uLogin.AcessToken.Expiry,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// @Summary Revoga o token de acesso
+// @Description Invalida o token de acesso atual do usuário.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param token path string true "Token de acesso a ser revogado"
+// @Success 202 "Token revogado com sucesso"
+// @Failure 404 {object} rest_err.RestErr "Token não encontrado"
+// @Failure 500 {object} rest_err.RestErr "Erro interno do servidor"
+// @Router /api/auth/logout/{token} [post]
+func (ctrl *controllerImpl) Logout(c *gin.Context) {
+	token := c.Param("token")
+	if err := ctrl.Service.RevokeAcessToken(c.Request.Context(), token); err != nil {
+		restErr := rest_err.NewForbiddenError("user not authorized")
+		c.JSON(restErr.Code, restErr)
+		return
+	}
+	c.JSON(http.StatusAccepted, nil)
+}
+
+// @Summary Solicita um código OTP
+// @Description Gera um OTP vinculado ao e-mail e envia por e-mail.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body OTPRequest true "Email para envio do OTP"
+// @Success 202 "OTP enviado com sucesso"
+// @Failure 400 {object} rest_err.RestErr "JSON inválido"
+// @Failure 409 {object} rest_err.RestErr "OTP já existente"
+// @Failure 500 {object} rest_err.RestErr "Erro interno"
+// @Router /api/auth/otp [post]
+func (ctrl *controllerImpl) CreateOTP(c *gin.Context) {
+	var req OTPRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		restErr := rest_err.NewBadRequestError("invalid json body")
+		c.JSON(restErr.Code, restErr)
+		return
+	}
+
+	if err := ctrl.Service.CreateOTPCode(c.Request.Context(), req.Email); err != nil {
+		var restErr *rest_err.RestErr
+
+		switch {
+		case errors.Is(err, OTPCodeExist):
+			restErr = rest_err.NewConflictValidationError(err.Error(), nil)
+		case errors.Is(err, user.ErrNotFound):
+			restErr = rest_err.NewNotFoundError(err.Error())
+		case errors.Is(err, mailer.ErrMailerNotInitialized):
+			causes := []rest_err.Causes{rest_err.NewCause("Mailer", "mailer not initialized")}
+			restErr = rest_err.NewInternalServerError("internal server error", causes)
+		default:
+			restErr = rest_err.NewInternalServerError("internal server error", nil)
+		}
+
+		c.JSON(restErr.Code, restErr)
+		return
+	}
+
+	c.Status(http.StatusAccepted)
+}
+
+// @Summary Troca a senha usando OTP
+// @Description Valida o OTP e troca a senha do usuário.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body OTPResetPasswordRequest true "Email, OTP e nova senha"
+// @Success 200 "Senha alterada com sucesso"
+// @Failure 400 {object} rest_err.RestErr "JSON inválido"
+// @Failure 403 {object} rest_err.RestErr "OTP inválido"
+// @Failure 500 {object} rest_err.RestErr "Erro interno"
+// @Router /api/auth/password/reset [post]
+func (ctrl *controllerImpl) ResetPassword(c *gin.Context) {
+	var req OTPResetPasswordRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		restErr := rest_err.NewBadRequestError("invalid json body")
+		c.JSON(restErr.Code, restErr)
+		return
+	}
+
+	ok, err := ctrl.Service.ChangeUserPwd(
+		c.Request.Context(),
+		req.OTPCode,
+		req.Email,
+		req.Password,
+	)
+	if err != nil {
+		var restErr *rest_err.RestErr
+
+		switch {
+		case errors.Is(err, OTPCodeWrong):
+			restErr = rest_err.NewForbiddenError(err.Error())
+		default:
+			restErr = rest_err.NewInternalServerError("internal server error", nil)
+		}
+
+		c.JSON(restErr.Code, restErr)
+		return
+	}
+
+	if !ok {
+		// fallback defensivo, teoricamente não deveria cair aqui
+		restErr := rest_err.NewInternalServerError("could not change password", nil)
+		c.JSON(restErr.Code, restErr)
+		return
+	}
+
+	c.Status(http.StatusOK)
+}

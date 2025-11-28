@@ -1,4 +1,44 @@
 definitions:
+  auth.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  auth.LoginResponse:
+    properties:
+      expire:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/user.UserResponseDto'
+    type: object
+  auth.OTPRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  auth.OTPResetPasswordRequest:
+    properties:
+      email:
+        type: string
+      otp:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - otp
+    - password
+    type: object
   rest_err.Causes:
     properties:
       field:
@@ -124,6 +164,136 @@ definitions:
 info:
   contact: {}
 paths:
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Recebe email e senha, autentica o usuário e retorna o token de
+        acesso.
+      parameters:
+      - description: Credenciais do Usuário (Email e Senha)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login bem-sucedido
+          schema:
+            $ref: '#/definitions/auth.LoginResponse'
+        "400":
+          description: Requisição inválida (JSON mal formatado)
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "404":
+          description: Credenciais inválidas (usuário/senha errados)
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "409":
+          description: Token duplicado ou conflito
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "500":
+          description: Erro interno do servidor
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+      summary: Efetua o login do usuário
+      tags:
+      - Auth
+  /api/auth/logout/{token}:
+    post:
+      consumes:
+      - application/json
+      description: Invalida o token de acesso atual do usuário.
+      parameters:
+      - description: Token de acesso a ser revogado
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Token revogado com sucesso
+        "404":
+          description: Token não encontrado
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "500":
+          description: Erro interno do servidor
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+      summary: Revoga o token de acesso
+      tags:
+      - Auth
+  /api/auth/otp:
+    post:
+      consumes:
+      - application/json
+      description: Gera um OTP vinculado ao e-mail e envia por e-mail.
+      parameters:
+      - description: Email para envio do OTP
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.OTPRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: OTP enviado com sucesso
+        "400":
+          description: JSON inválido
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "409":
+          description: OTP já existente
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "500":
+          description: Erro interno
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+      summary: Solicita um código OTP
+      tags:
+      - Auth
+  /api/auth/password/reset:
+    post:
+      consumes:
+      - application/json
+      description: Valida o OTP e troca a senha do usuário.
+      parameters:
+      - description: Email, OTP e nova senha
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.OTPResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Senha alterada com sucesso
+        "400":
+          description: JSON inválido
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "403":
+          description: OTP inválido
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "500":
+          description: Erro interno
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+      summary: Troca a senha usando OTP
+      tags:
+      - Auth
   /api/tenant:
     delete:
       description: Exclui permanentemente um tenant no sistema usando o UUID ou o
@@ -244,7 +414,7 @@ paths:
       summary: Atualiza um Tenant
       tags:
       - Tenant
-  /api/tenant/create:
+  /api/tenant/create-blocked:
     post:
       consumes:
       - application/json
