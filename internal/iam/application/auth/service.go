@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
-	"tenant-crud-simply/internal/iam/application/auth/cache"
+	"tenant-crud-simply/internal/iam/application/auth/internal/cache"
 	"tenant-crud-simply/internal/iam/domain/user"
 	"tenant-crud-simply/internal/infra/jwt"
 	"tenant-crud-simply/internal/pkg/mailer"
