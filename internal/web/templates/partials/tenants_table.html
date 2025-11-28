@@ -1,0 +1,70 @@
+<!-- Partial template for tenant table -->
+<div class="table-wrapper">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Documento</th>
+                <th>UUID</th>
+                <th>Status</th>
+                <th>Criado em</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{if .Tenants}}
+            {{range .Tenants}}
+            <tr>
+                <td><strong>{{.Name}}</strong></td>
+                <td>{{.Document}}</td>
+                <td style="font-family: monospace; font-size: 0.875rem;">{{.UUID}}</td>
+                <td>
+                    <span
+                        style="display: inline-block; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; {{if .Live}}background: #c6f6d5; color: #22543d;{{else}}background: #fed7d7; color: #742a2a;{{end}}">
+                        {{if .Live}}Ativo{{else}}Inativo{{end}}
+                    </span>
+                </td>
+                <td>{{.CreateAt.Format "02/01/2006"}}</td>
+                <td class="table-actions">
+                    <button class="btn btn-sm btn-secondary"
+                        onclick='openModal("edit", {uuid: "{{.UUID}}", name: "{{.Name}}", document: "{{.Document}}", live: "{{.Live}}"})'>
+                        ✏️ Editar
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick='deleteTenant("{{.UUID}}", "{{.Name}}")'>
+                        🗑️ Excluir
+                    </button>
+                </td>
+            </tr>
+            {{end}}
+            {{else}}
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-light);">
+                    Nenhum tenant encontrado
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+
+{{if .Pagination}}
+<div class="pagination">
+    {{if gt .Pagination.Page 1}}
+    <button class="pagination-btn"
+        hx-get="/api/web/tenants/list?page={{subtract .Pagination.Page 1}}&pageSize={{.Pagination.PageSize}}"
+        hx-target="#tenants-table">
+        ← Anterior
+    </button>
+    {{end}}
+
+    <span class="pagination-btn active">Página {{.Pagination.Page}}</span>
+
+    {{if .Pagination.HasNext}}
+    <button class="pagination-btn"
+        hx-get="/api/web/tenants/list?page={{add .Pagination.Page 1}}&pageSize={{.Pagination.PageSize}}"
+        hx-target="#tenants-table">
+        Próxima →
+    </button>
+    {{end}}
+</div>
+{{end}}

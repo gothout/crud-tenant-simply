@@ -1,0 +1,107 @@
+{{define "content"}}
+<div class="fade-in">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <h1>Gerenciar Tenants</h1>
+        <button class="btn btn-primary" onclick="openModal('createTenantModal')">➕ Novo Tenant</button>
+    </div>
+
+    <!-- Filtros e Busca -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <form hx-get="/api/web/tenant/list" hx-target="#tenants-table" hx-trigger="submit">
+            <div style="display: grid; grid-template-columns: 1fr 1fr auto;gap: 1rem;">
+                <div>
+                    <input type="text" name="uuid" class="form-input" placeholder="Buscar por UUID">
+                </div>
+                <div>
+                    <input type="text" name="document" class="form-input" placeholder="Buscar por Documento">
+                </div>
+                <button type="submit" class="btn btn-secondary">🔍 Buscar</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabela de Tenants -->
+    <div id="tenants-table">
+        <div style="text-align: center; padding: 3rem;">
+            <p style="color: var(--text-secondary);">Use os filtros acima para buscar tenants</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Criar/Editar Tenant -->
+<div id="createTenantModal" class="modal-backdrop" style="display: none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modal-title">Novo Tenant</h3>
+            <button class="modal-close" onclick="closeModal('createTenantModal')">✕</button>
+        </div>
+
+        <form hx-post="/api/web/tenant/create" hx-target="#tenants-table" hx-swap="innerHTML"
+            hx-on="htmx:afterRequest: if(event.detail.successful) closeModal('createTenantModal')">
+
+            <input type="hidden" id="tenant-uuid" name="uuid">
+
+            <div class="form-group">
+                <label for="tenant-name" class="form-label">Nome *</label>
+                <input type="text" id="tenant-name" name="name" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label for="tenant-document" class="form-label">Documento (CNPJ/CPF) *</label>
+                <input type="text" id="tenant-document" name="document" class="form-input" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">
+                    <input type="checkbox" id="tenant-live" name="live" checked>
+                    Ativo
+                </label>
+            </div>
+
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+                <button type="button" class="btn btn-secondary"
+                    onclick="closeModal('createTenantModal')">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+        // Reset form
+        document.querySelector(`#${modalId} form`).reset();
+        document.getElementById('tenant-uuid').value = '';
+        document.getElementById('modal-title').textContent = 'Novo Tenant';
+    }
+
+    function editTenant(uuid, name, document, live) {
+        document.getElementById('tenant-uuid').value = uuid;
+        document.getElementById('tenant-name').value = name;
+        document.getElementById('tenant-document').value = document;
+        document.getElementById('tenant-live').checked = live;
+        document.getElementById('modal-title').textContent = 'Editar Tenant';
+
+        // Change form action to PATCH
+        const form = document.querySelector('#createTenantModal form');
+        form.setAttribute('hx-patch', `/api/web/tenant/${uuid}`);
+        form.setAttribute('hx-post', '');
+
+        openModal('createTenantModal');
+    }
+
+    function deleteTenant(uuid) {
+        if (confirm('Tem certeza que deseja excluir este tenant?')) {
+            htmx.ajax('DELETE', `/api/web/tenant?uuid=${uuid}`, {
+                target: '#tenants-table',
+                swap: 'innerHTML'
+            });
+        }
+    }
+</script>
+{{end}}

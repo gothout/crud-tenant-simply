@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Sistema de Gestão</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/main.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    {{if .ShowHeader}}
+    <header class="header">
+        <nav class="nav container">
+            <a href="/dashboard" class="nav-brand">🚀 Tenant Manager</a>
+            <ul class="nav-menu">
+                <li><a href="/dashboard" class="nav-link">Dashboard</a></li>
+                <li><a href="/tenants" class="nav-link">Tenants</a></li>
+                <li><a href="/users" class="nav-link">Usuários</a></li>
+                {{if .User}}
+                <li><span class="nav-link">👤 {{.User.Name}}</span></li>
+                <li>
+                    <form hx-post="/logout" hx-swap="none" style="display: inline;">
+                        <button type="submit" class="btn btn-sm btn-secondary">Sair</button>
+                    </form>
+                </li>
+                {{end}}
+            </ul>
+        </nav>
+    </header>
+    {{end}}
+
+    <main class="main-content">
+        {{template "content" .}}
+    </main>
+
+    {{if .ShowFooter}}
+    <footer style="text-align: center; padding: 2rem; color: var(--text-light); font-size: 0.875rem;">
+        <p>&copy; 2025 Tenant Manager. Desenvolvido com ❤️ e Golang + HTMX</p>
+    </footer>
+    {{end}}
+</body>
+</html>

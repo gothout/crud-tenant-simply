@@ -1,0 +1,59 @@
+{{define "content"}}
+<div class="fade-in">
+    <div style="margin-bottom: 2rem;">
+        <h1>Dashboard</h1>
+        <p style="color: var(--text-secondary); font-size: 1.125rem;">Bem-vindo ao sistema de gestão de Tenants e
+            Usuários</p>
+    </div>
+
+    <div class="card-grid">
+        <!-- Card Tenants -->
+        <a href="/tenants" style="text-decoration: none; color: inherit;">
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">🏢</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Tenants</h3>
+                <p style="color: var(--text-secondary);">Gerenciar empresas e organizações</p>
+                <div style="margin-top: 1.5rem;">
+                    <span class="btn btn-sm btn-primary">Acessar →</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Card Users -->
+        <a href="/users" style="text-decoration: none; color: inherit;">
+            <div class="dashboard-card">
+                <div class="dashboard-card-icon">👥</div>
+                <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Usuários</h3>
+                <p style="color: var(--text-secondary);">Gerenciar usuários do sistema</p>
+                <div style="margin-top: 1.5rem;">
+                    <span class="btn btn-sm btn-primary">Acessar →</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Card Stats -->
+        <div class="dashboard-card" style="cursor: default;">
+            <div class="dashboard-card-icon">📊</div>
+            <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Estatísticas</h3>
+            <p style="color: var(--text-secondary);">Visão geral do sistema</p>
+            <div style="margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+                    <span style="color: var(--text-light); font-size: 0.875rem;">Status</span>
+                    <span style="color: var(--success-color); font-weight: 600;">● Online</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity Section -->
+    <div class="card" style="margin-top: 2rem;">
+        <div class="card-header">
+            <h2 class="card-title">Acesso Rápido</h2>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <a href="/tenants?action=create" class="btn btn-secondary">➕ Novo Tenant</a>
+            <a href="/users?action=create" class="btn btn-secondary">➕ Novo Usuário</a>
+        </div>
+    </div>
+</div>
+{{end}}
