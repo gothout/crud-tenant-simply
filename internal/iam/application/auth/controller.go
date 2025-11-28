@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"tenant-crud-simply/internal/iam/domain/user"
+	"tenant-crud-simply/internal/iam/middleware"
 	"tenant-crud-simply/internal/pkg/mailer"
 	"tenant-crud-simply/internal/pkg/rest_err"
 
@@ -12,6 +13,7 @@ import (
 
 type Controller interface {
 	Routes(routes gin.IRouter)
+	Healthcheck(c *gin.Context)
 	Login(c *gin.Context)
 	Logout(c *gin.Context)
 	CreateOTP(c *gin.Context)
@@ -36,6 +38,7 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 		authGroup.POST("/logout/:token", ctrl.Logout)
 		authGroup.POST("/otp", ctrl.CreateOTP)
 		authGroup.POST("/password/reset", ctrl.ResetPassword)
+		authGroup.GET("/healthcheck", middleware.MustUse().Middleware.SetContextAutorization(), ctrl.Healthcheck)
 	}
 }
 
@@ -205,4 +208,39 @@ func (ctrl *controllerImpl) ResetPassword(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+}
+
+// @Summary Verifica o status do login
+// @Description Retorna os dados do usuário logado se o token for válido.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Security     BearerAuth
+// @Success 200 {object} LoginResponse "Dados do usuário logado"
+// @Failure 401 {object} rest_err.RestErr "Não autorizado"
+// @Router /api/auth/healthcheck [get]
+func (ctrl *controllerImpl) Healthcheck(c *gin.Context) {
+	lUser, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		restErr := rest_err.NewForbiddenError("user not authorized")
+		c.JSON(restErr.Code, restErr)
+		return
+	}
+
+	response := LoginResponse{
+		User: user.UserResponseDto{
+			UUID:       lUser.User.UUID,
+			TenantUUID: lUser.User.TenantUUID,
+			Name:       lUser.User.Name,
+			Email:      lUser.User.Email,
+			Role:       lUser.User.Role,
+			Live:       lUser.User.Live,
+			CreateAt:   lUser.User.CreateAt,
+			UpdateAt:   lUser.User.UpdateAt,
+		},
+		Token:  lUser.AcessToken.Token,
+		Expire: lUser.AcessToken.Expiry,
+	}
+
+	c.JSON(http.StatusOK, response)
 }

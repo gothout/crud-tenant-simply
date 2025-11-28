@@ -164,6 +164,27 @@ definitions:
 info:
   contact: {}
 paths:
+  /api/auth/healthcheck:
+    get:
+      consumes:
+      - application/json
+      description: Retorna os dados do usuário logado se o token for válido.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Dados do usuário logado
+          schema:
+            $ref: '#/definitions/auth.LoginResponse'
+        "401":
+          description: Não autorizado
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+      security:
+      - BearerAuth: []
+      summary: Verifica o status do login
+      tags:
+      - Auth
   /api/auth/login:
     post:
       consumes:
