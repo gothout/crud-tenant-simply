@@ -9,8 +9,8 @@
     </div>
 
     <!-- Filters -->
-    <div class="card" style="margin-bottom: 2rem;">
-        <form hx-get="/api/web/user/list" hx-target="#users-table" hx-trigger="submit">
+        <div class="card" style="margin-bottom: 2rem;">
+            <form hx-get="/api/web/user/list/html" hx-target="#users-table" hx-trigger="submit">
             <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label class="form-label">Buscar por UUID</label>
@@ -26,11 +26,7 @@
     </div>
 
     <!-- Users Table -->
-    <div id="users-table">
-        <div class="flex-center" style="padding: 3rem;">
-            <p style="color: var(--text-secondary);">Use os filtros acima para buscar usuários</p>
-        </div>
-    </div>
+    <div id="users-table" hx-get="/api/web/user/list/html" hx-trigger="load" hx-swap="innerHTML"></div>
 </div>
 
 <!-- Modal Create/Edit -->
@@ -40,7 +36,8 @@
             <h3 id="user-modal-title">Novo Usuário</h3>
             <button class="modal-close" onclick="closeUserModal()">&times;</button>
         </div>
-        <form id="user-form" hx-post="/api/web/user" hx-target="#users-table">
+        <form id="user-form" hx-post="/api/web/user" hx-target="#users-table" hx-encoding="json" hx-swap="none"
+            hx-on="htmx:afterRequest: if(event.detail.successful){ closeUserModal(); htmx.ajax('GET', '/api/web/user/list/html', {target: '#users-table', swap: 'innerHTML'}); }">
             <input type="hidden" id="user-uuid" name="uuid">
 
             <div class="form-group">
@@ -101,10 +98,15 @@
         const passwordGroup = document.getElementById('password-group');
         const passwordInput = document.getElementById('user-password');
 
+        form.addEventListener('htmx:configRequest', function (event) {
+            event.detail.parameters.live = document.getElementById('user-live').value === 'true';
+        }, { once: true });
+
         if (action === 'create') {
             title.textContent = 'Novo Usuário';
             form.reset();
             form.setAttribute('hx-post', '/api/web/user');
+            form.removeAttribute('hx-patch');
             passwordInput.required = true;
             passwordGroup.style.display = 'block';
         } else if (action === 'edit' && data) {
@@ -114,8 +116,9 @@
             document.getElementById('user-name').value = data.name;
             document.getElementById('user-email').value = data.email;
             document.getElementById('user-role').value = data.role;
-            document.getElementById('user-live').value = data.live;
+            document.getElementById('user-live').value = String(data.live);
             form.setAttribute('hx-patch', `/api/web/user/${data.uuid}`);
+            form.removeAttribute('hx-post');
             passwordInput.required = false;
             passwordGroup.style.display = 'none';
         }
@@ -125,15 +128,23 @@
     }
 
     function closeUserModal() {
+        const form = document.getElementById('user-form');
+        form.reset();
+        form.setAttribute('hx-post', '/api/web/user');
+        form.removeAttribute('hx-patch');
+        document.getElementById('password-group').style.display = 'block';
+        document.getElementById('user-password').required = true;
         document.getElementById('user-modal').style.display = 'none';
     }
 
     function deleteUser(uuid, name) {
         if (confirm(`Tem certeza que deseja excluir o usuário "${name}"?`)) {
-            htmx.ajax('DELETE', `/api/web/user/${uuid}`, {
-                target: '#users-table',
-                swap: 'innerHTML'
-            });
+            fetch(`/api/web/user?uuid=${uuid}`, { method: 'DELETE' })
+                .then(response => {
+                    if (response.ok) {
+                        htmx.ajax('GET', '/api/web/user/list/html', { target: '#users-table', swap: 'innerHTML' });
+                    }
+                });
         }
     }
 </script>

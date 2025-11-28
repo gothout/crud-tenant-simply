@@ -6,8 +6,8 @@
     </div>
 
     <!-- Filtros e Busca -->
-    <div class="card" style="margin-bottom: 2rem;">
-        <form hx-get="/api/web/tenant/list" hx-target="#tenants-table" hx-trigger="submit">
+        <div class="card" style="margin-bottom: 2rem;">
+            <form hx-get="/api/web/tenant/list/html" hx-target="#tenants-table" hx-trigger="submit">
             <div style="display: grid; grid-template-columns: 1fr 1fr auto;gap: 1rem;">
                 <div>
                     <input type="text" name="uuid" class="form-input" placeholder="Buscar por UUID">
@@ -21,11 +21,7 @@
     </div>
 
     <!-- Tabela de Tenants -->
-    <div id="tenants-table">
-        <div style="text-align: center; padding: 3rem;">
-            <p style="color: var(--text-secondary);">Use os filtros acima para buscar tenants</p>
-        </div>
-    </div>
+    <div id="tenants-table" hx-get="/api/web/tenant/list/html" hx-trigger="load" hx-swap="innerHTML"></div>
 </div>
 
 <!-- Modal Criar/Editar Tenant -->
@@ -36,8 +32,8 @@
             <button class="modal-close" onclick="closeModal('createTenantModal')">✕</button>
         </div>
 
-        <form hx-post="/api/web/tenant/create" hx-target="#tenants-table" hx-swap="innerHTML"
-            hx-on="htmx:afterRequest: if(event.detail.successful) closeModal('createTenantModal')">
+        <form hx-post="/api/web/tenant/create" hx-encoding="json" hx-swap="none"
+            hx-on="htmx:afterRequest: if(event.detail.successful) { closeModal('createTenantModal'); htmx.ajax('GET', '/api/web/tenant/list/html', {target: '#tenants-table', swap: 'innerHTML'}); }">
 
             <input type="hidden" id="tenant-uuid" name="uuid">
 
@@ -72,12 +68,20 @@
         document.getElementById(modalId).style.display = 'flex';
     }
 
+    document.querySelector('#createTenantModal form').addEventListener('htmx:configRequest', function (event) {
+        event.detail.parameters.live = document.getElementById('tenant-live').checked;
+    });
+
     function closeModal(modalId) {
         document.getElementById(modalId).style.display = 'none';
         // Reset form
         document.querySelector(`#${modalId} form`).reset();
         document.getElementById('tenant-uuid').value = '';
         document.getElementById('modal-title').textContent = 'Novo Tenant';
+
+        const form = document.querySelector('#createTenantModal form');
+        form.setAttribute('hx-post', '/api/web/tenant/create');
+        form.removeAttribute('hx-patch');
     }
 
     function editTenant(uuid, name, document, live) {
@@ -90,17 +94,19 @@
         // Change form action to PATCH
         const form = document.querySelector('#createTenantModal form');
         form.setAttribute('hx-patch', `/api/web/tenant/${uuid}`);
-        form.setAttribute('hx-post', '');
+        form.removeAttribute('hx-post');
 
         openModal('createTenantModal');
     }
 
     function deleteTenant(uuid) {
         if (confirm('Tem certeza que deseja excluir este tenant?')) {
-            htmx.ajax('DELETE', `/api/web/tenant?uuid=${uuid}`, {
-                target: '#tenants-table',
-                swap: 'innerHTML'
-            });
+            fetch(`/api/web/tenant?uuid=${uuid}`, { method: 'DELETE' })
+                .then(response => {
+                    if (response.ok) {
+                        htmx.ajax('GET', '/api/web/tenant/list/html', { target: '#tenants-table', swap: 'innerHTML' });
+                    }
+                });
         }
     }
 </script>

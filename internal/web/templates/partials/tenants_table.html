@@ -27,7 +27,7 @@
                 <td>{{.CreateAt.Format "02/01/2006"}}</td>
                 <td class="table-actions">
                     <button class="btn btn-sm btn-secondary"
-                        onclick='openModal("edit", {uuid: "{{.UUID}}", name: "{{.Name}}", document: "{{.Document}}", live: "{{.Live}}"})'>
+                        onclick='editTenant("{{.UUID}}", "{{.Name}}", "{{.Document}}", {{.Live}})'>
                         ✏️ Editar
                     </button>
                     <button class="btn btn-sm btn-danger" onclick='deleteTenant("{{.UUID}}", "{{.Name}}")'>
@@ -51,7 +51,7 @@
 <div class="pagination">
     {{if gt .Pagination.Page 1}}
     <button class="pagination-btn"
-        hx-get="/api/web/tenants/list?page={{subtract .Pagination.Page 1}}&pageSize={{.Pagination.PageSize}}"
+        hx-get="/api/web/tenant/list/html?page={{subtract .Pagination.Page 1}}&pageSize={{.Pagination.PageSize}}"
         hx-target="#tenants-table">
         ← Anterior
     </button>
@@ -61,7 +61,7 @@
 
     {{if .Pagination.HasNext}}
     <button class="pagination-btn"
-        hx-get="/api/web/tenants/list?page={{add .Pagination.Page 1}}&pageSize={{.Pagination.PageSize}}"
+        hx-get="/api/web/tenant/list/html?page={{add .Pagination.Page 1}}&pageSize={{.Pagination.PageSize}}"
         hx-target="#tenants-table">
         Próxima →
     </button>

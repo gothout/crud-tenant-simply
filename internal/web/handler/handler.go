@@ -19,6 +19,32 @@ type WebHandler struct {
 	templates    map[string]*template.Template
 }
 
+// fetchTenants busca uma lista de tenants para uso em dropdowns e tabelas
+func (h *WebHandler) fetchTenants(token string) ([]map[string]interface{}, error) {
+	apiURL := fmt.Sprintf("http://localhost:%d/api/tenant/list?page=1&pageSize=100", viper.GetInt("server.http.port"))
+
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Tenants []map[string]interface{} `json:"tenants"`
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	return result.Tenants, nil
+}
+
 // NewWebHandler cria uma nova instância do handler web
 func NewWebHandler(sessionStore *sessions.CookieStore) (*WebHandler, error) {
 	// Mapa para armazenar templates compilados por página
@@ -58,6 +84,7 @@ func NewWebHandler(sessionStore *sessions.CookieStore) (*WebHandler, error) {
 	// Carrega parciais (sem base.html)
 	partials := []string{
 		"partials/tenants_table.html",
+		"partials/users_table.html",
 	}
 	for _, partial := range partials {
 		tmpl := template.New("").Funcs(funcMap)
@@ -227,6 +254,9 @@ func (h *WebHandler) ServeTenants(c *gin.Context) {
 func (h *WebHandler) ServeUsers(c *gin.Context) {
 	session, _ := h.sessionStore.Get(c.Request, webMiddleware.SessionName)
 
+	token, _ := session.Values[webMiddleware.SessionUserKey].(string)
+	tenants, _ := h.fetchTenants(token)
+
 	h.renderTemplate(c, "users.html", gin.H{
 		"Title":      "Gerenciar Usuários",
 		"ShowHeader": true,
@@ -235,6 +265,6 @@ func (h *WebHandler) ServeUsers(c *gin.Context) {
 			"Name":  session.Values["user_name"],
 			"Email": session.Values["user_email"],
 		},
-		"Tenants": []gin.H{}, // TODO: Carregar tenants para o dropdown
+		"Tenants": tenants,
 	})
 }

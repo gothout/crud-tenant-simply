@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	webMiddleware "tenant-crud-simply/internal/web/middleware"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
@@ -45,7 +46,9 @@ func (h *WebHandler) ProxyAPI(c *gin.Context) {
 	}
 
 	// Copia headers relevantes
-	req.Header.Set("Content-Type", "application/json")
+	if contentType := c.Request.Header.Get("Content-Type"); contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	// Executa a requisição
@@ -117,4 +120,75 @@ func (h *WebHandler) ProxyTenantsListHTML(c *gin.Context) {
 		return
 	}
 	tmpl.ExecuteTemplate(c.Writer, "tenants_table.html", data)
+}
+
+// ProxyUsersListHTML retorna HTML parcial para a tabela de usuários
+func (h *WebHandler) ProxyUsersListHTML(c *gin.Context) {
+	token := webMiddleware.GetToken(c)
+	if token == "" {
+		c.HTML(http.StatusUnauthorized, "partials/users_table.html", gin.H{
+			"Error": "Não autorizado",
+		})
+		return
+	}
+
+	page := c.DefaultQuery("page", "1")
+	pageSize := c.DefaultQuery("pageSize", "10")
+
+	apiURL := fmt.Sprintf("http://localhost:%d/api/user/list?page=%s&pageSize=%s",
+		viper.GetInt("server.http.port"), page, pageSize)
+
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.HTML(http.StatusInternalServerError, "partials/users_table.html", gin.H{
+			"Error": "Erro ao carregar usuários",
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	var users []map[string]interface{}
+	body, _ := io.ReadAll(resp.Body)
+	json.Unmarshal(body, &users)
+
+	for i, user := range users {
+		if created, ok := user["create_at"].(string); ok {
+			if t, err := time.Parse(time.RFC3339, created); err == nil {
+				user["create_at"] = t.Format("02/01/2006")
+				users[i] = user
+			}
+		}
+	}
+
+	// Busca tenants para mapear nomes
+	tenants, _ := h.fetchTenants(token)
+	tenantNames := make(map[string]string)
+	for _, tenant := range tenants {
+		uuid, _ := tenant["UUID"].(string)
+		name, _ := tenant["Name"].(string)
+		document, _ := tenant["Document"].(string)
+		if uuid != "" {
+			if document != "" {
+				tenantNames[uuid] = fmt.Sprintf("%s (%s)", name, document)
+			} else {
+				tenantNames[uuid] = name
+			}
+		}
+	}
+
+	data := gin.H{
+		"Users":       users,
+		"TenantNames": tenantNames,
+	}
+
+	tmpl, ok := h.templates["partials/users_table.html"]
+	if !ok {
+		c.String(http.StatusInternalServerError, "Template partial not found")
+		return
+	}
+	tmpl.ExecuteTemplate(c.Writer, "users_table.html", data)
 }

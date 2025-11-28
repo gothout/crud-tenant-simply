@@ -103,6 +103,8 @@ func SetupWebRoutes(r *gin.Engine) {
 		// API proxy para HTMX
 		apiWeb := protected.Group("/api/web")
 		{
+			apiWeb.GET("/tenant/list/html", webHandler.ProxyTenantsListHTML)
+			apiWeb.GET("/user/list/html", webHandler.ProxyUsersListHTML)
 			// Proxy genérico para todas as rotas da API
 			apiWeb.Any("/*path", webHandler.ProxyAPI)
 		}
