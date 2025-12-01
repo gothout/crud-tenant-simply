@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"tenant-crud-simply/internal/iam/domain/tenant"
+	"tenant-crud-simply/internal/iam/middleware"
 	"tenant-crud-simply/internal/pkg/rest_err"
 
 	"github.com/gin-gonic/gin"
@@ -31,12 +32,16 @@ func NewController(service Service) Controller {
 
 func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 	userGroup := routes.Group("/user")
+
+	// Middleware de autenticação
+	mw := middleware.MustUse().Middleware
+
 	{
-		userGroup.POST("/:identifier", ctrl.Create)
-		userGroup.GET("", ctrl.Read)
-		userGroup.GET("/list", ctrl.List)
-		userGroup.PATCH("/:identifier", ctrl.Update)
-		userGroup.DELETE("", ctrl.Delete)
+		userGroup.POST("/:identifier", mw.SetContextAutorization(), ctrl.Create)
+		userGroup.GET("", mw.SetContextAutorization(), ctrl.Read)
+		userGroup.GET("/list", mw.SetContextAutorization(), ctrl.List)
+		userGroup.PATCH("/:identifier", mw.SetContextAutorization(), ctrl.Update)
+		userGroup.DELETE("", mw.SetContextAutorization(), ctrl.Delete)
 	}
 }
 

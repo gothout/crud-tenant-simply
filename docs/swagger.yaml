@@ -156,6 +156,9 @@ definitions:
     - SYSTEM_ADMIN
     - TENANT_ADMIN
     - TENANT_USER
+    - SYSTEM_ADMIN
+    - TENANT_ADMIN
+    - TENANT_USER
     type: string
     x-enum-varnames:
     - RoleSystemAdmin
@@ -332,7 +335,7 @@ paths:
       - application/json
       responses:
         "204":
-          description: Tenant excluído com sucesso (No Content).
+          description: model.Tenant excluído com sucesso (No Content).
           schema:
             type: string
         "400":
@@ -341,14 +344,16 @@ paths:
           schema:
             $ref: '#/definitions/rest_err.RestErr'
         "404":
-          description: Tenant não encontrado com os dados fornecidos.
+          description: model.Tenant não encontrado com os dados fornecidos.
           schema:
             $ref: '#/definitions/rest_err.RestErr'
         "500":
           description: Erro interno do servidor.
           schema:
             $ref: '#/definitions/rest_err.RestErr'
-      summary: Deleta um Tenant
+      security:
+      - BearerAuth: []
+      summary: Deleta um model.Tenant
       tags:
       - Tenant
     get:
@@ -367,7 +372,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: Tenant encontrado com sucesso.
+          description: model.Tenant encontrado com sucesso.
           schema:
             $ref: '#/definitions/tenant.TenantResponseDto'
         "400":
@@ -376,7 +381,7 @@ paths:
           schema:
             $ref: '#/definitions/rest_err.RestErr'
         "404":
-          description: Tenant não encontrado com os dados fornecidos.
+          description: model.Tenant não encontrado com os dados fornecidos.
           schema:
             $ref: '#/definitions/rest_err.RestErr'
         "500":
@@ -411,7 +416,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: Tenant atualizado com sucesso.
+          description: model.Tenant atualizado com sucesso.
           schema:
             $ref: '#/definitions/tenant.TenantResponseDto'
         "400":
@@ -420,7 +425,7 @@ paths:
           schema:
             $ref: '#/definitions/rest_err.RestErr'
         "404":
-          description: Tenant não encontrado para o UUID fornecido.
+          description: model.Tenant não encontrado para o UUID fornecido.
           schema:
             $ref: '#/definitions/rest_err.RestErr'
         "409":
@@ -432,6 +437,8 @@ paths:
           description: Erro interno do servidor.
           schema:
             $ref: '#/definitions/rest_err.RestErr'
+      security:
+      - BearerAuth: []
       summary: Atualiza um Tenant
       tags:
       - Tenant
@@ -464,6 +471,8 @@ paths:
           schema:
             additionalProperties: true
             type: object
+      security:
+      - BearerAuth: []
       summary: Cria um novo tenant
       tags:
       - Tenant

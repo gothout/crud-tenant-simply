@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"tenant-crud-simply/internal/iam/domain/user"
+	"tenant-crud-simply/internal/iam/domain/model"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +14,6 @@ type AcessToken struct {
 }
 
 type Login struct {
-	User       user.User
+	User       model.User
 	AcessToken AcessToken
 }

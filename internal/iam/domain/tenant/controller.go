@@ -2,6 +2,8 @@ package tenant
 
 import (
 	"net/http"
+	"tenant-crud-simply/internal/iam/domain/model"
+	"tenant-crud-simply/internal/iam/middleware"
 	"tenant-crud-simply/internal/pkg/rest_err"
 	"time"
 
@@ -11,7 +13,7 @@ import (
 
 // Controller interface define os métodos do controller de tenant
 type Controller interface {
-	Routes(routes gin.IRouter, authMiddleware gin.HandlerFunc)
+	Routes(routes gin.IRouter)
 	Create(c *gin.Context)
 	Read(c *gin.Context)
 	List(c *gin.Context)
@@ -22,25 +24,30 @@ type Controller interface {
 // controllerImpl implementa o Controller
 type controllerImpl struct {
 	service Service
+	mw      middleware.Middleware
 }
 
 // NewController cria uma nova instância do controller
 func NewController(service Service) Controller {
+	mw := middleware.MustUse().Middleware
+
 	return &controllerImpl{
 		service: service,
+		mw:      mw,
 	}
 }
 
 // Routes registra as rotas do tenant
-func (ctrl *controllerImpl) Routes(routes gin.IRouter, authMiddleware gin.HandlerFunc) {
+func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 	tenantGroup := routes.Group("/tenant")
+
 	{
-		tenantGroup.POST("/create", ctrl.Create)
-		tenantGroup.POST("/create-blocked", authMiddleware, ctrl.Create)
-		tenantGroup.GET("", ctrl.Read)
-		tenantGroup.GET("/list", ctrl.List)
-		tenantGroup.PATCH("/:uuid", ctrl.Update)
-		tenantGroup.DELETE("", ctrl.Delete)
+		// Rota protegida com autenticação e autorização de role
+		tenantGroup.POST("/create", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin), ctrl.Create)
+		tenantGroup.GET("", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin), ctrl.Read)
+		tenantGroup.GET("/list", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin), ctrl.List)
+		tenantGroup.PATCH("/:uuid", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin), ctrl.Update)
+		tenantGroup.DELETE("", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin), ctrl.Delete)
 	}
 }
 
@@ -50,6 +57,7 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter, authMiddleware gin.Handle
 // @Tags Tenant
 // @Accept json
 // @Produce json
+// @Security     BearerAuth
 // @Param request body CreateTenantRequestDto true "Dados do tenant"
 // @Success 201 {object} TenantResponseDto
 // @Failure 400 {object} map[string]interface{}
@@ -67,7 +75,7 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 	}
 
 	// Cria o modelo Tenant
-	tenant := Tenant{
+	tenant := model.Tenant{
 		Name:     req.Name,
 		Document: req.Document,
 		Live:     true,
@@ -111,9 +119,9 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 // @Param        uuid query string false "UUID do tenant a ser buscado. (Ex: 8871abf3-ed11-4770-b986-e8d98d022d4f)"
 // @Param        document query string false "Documento (CNPJ/CPF) do tenant a ser buscado. (Ex: 12345678901234)"
 //
-// @Success      200  {object}  TenantResponseDto  "Tenant encontrado com sucesso."
+// @Success      200  {object}  TenantResponseDto  "model.Tenant encontrado com sucesso."
 // @Failure      400  {object}  rest_err.RestErr    "Requisição inválida (UUID inválido, ou nenhum dos campos 'uuid'/'document' fornecido)."
-// @Failure      404  {object}  rest_err.RestErr    "Tenant não encontrado com os dados fornecidos."
+// @Failure      404  {object}  rest_err.RestErr    "model.Tenant não encontrado com os dados fornecidos."
 // @Failure      500  {object}  rest_err.RestErr    "Erro interno do servidor."
 //
 // @Router       /api/tenant [get]
@@ -144,10 +152,36 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		tenantUUID = parsedUUID
 	}
 
-	rTenant, err := ctrl.service.Read(c.Request.Context(), Tenant{
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
+	rTenant := model.Tenant{
 		UUID:     tenantUUID,
 		Document: req.Document,
-	})
+	}
+
+	// analisar se o usuario tem permissao de ler outras empresas ou apenas a propria
+	switch ctxIdentify.User.Role {
+	case model.RoleSystemAdmin:
+		//
+
+	case model.RoleTenantAdmin:
+		rTenant = model.Tenant{
+			UUID:     ctxIdentify.User.Tenant.UUID,
+			Document: ctxIdentify.User.Tenant.Document,
+		}
+
+	default:
+		e := rest_err.NewForbiddenError("Ação não permitida.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
+	rTenant, err := ctrl.service.Read(c.Request.Context(), rTenant)
 	if err != nil {
 		var restError *rest_err.RestErr
 		switch err {
@@ -235,13 +269,14 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 // @Tags         Tenant
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 //
 // @Param        uuid path string true "UUID do tenant a ser atualizado."
 // @Param        request body UpdateTenantRequestDto true "Campos do tenant a serem atualizados. Apenas os campos presentes serão modificados."
 //
-// @Success      200  {object}  TenantResponseDto  "Tenant atualizado com sucesso."
+// @Success      200  {object}  TenantResponseDto  "model.Tenant atualizado com sucesso."
 // @Failure      400  {object}  rest_err.RestErr    "Requisição inválida (corpo JSON mal formatado, UUID inválido ou dados de entrada inválidos)."
-// @Failure      404  {object}  rest_err.RestErr    "Tenant não encontrado para o UUID fornecido."
+// @Failure      404  {object}  rest_err.RestErr    "model.Tenant não encontrado para o UUID fornecido."
 // @Failure      409  {object}  rest_err.RestErr    "Conflito (o novo 'document' fornecido já está em uso por outro tenant)."
 // @Failure      500  {object}  rest_err.RestErr    "Erro interno do servidor."
 //
@@ -262,12 +297,38 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 		return
 	}
 
-	uTenant := Tenant{
+	uTenant := model.Tenant{
 		UUID:     tenantUUID,
 		Document: request.Document,
 		Live:     *request.Live,
 		Name:     request.Name,
 		UpdateAt: time.Now().UTC(),
+	}
+
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
+	// analisar se o usuario tem permissao de ler outras empresas ou apenas a propria
+	switch ctxIdentify.User.Role {
+	case model.RoleSystemAdmin:
+		//
+	case model.RoleTenantAdmin:
+		uTenant = model.Tenant{
+			UUID:     ctxIdentify.User.Tenant.UUID,
+			Document: ctxIdentify.User.Tenant.Document,
+			Live:     ctxIdentify.User.Tenant.Live,
+			Name:     request.Name,
+			UpdateAt: time.Now().UTC(),
+		}
+
+	default:
+		e := rest_err.NewForbiddenError("Ação não permitida.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
 	}
 
 	tenantUpdated, err := ctrl.service.Update(c.Request.Context(), &uTenant)
@@ -300,17 +361,18 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 	})
 }
 
-// @Summary      Deleta um Tenant
+// @Summary      Deleta um model.Tenant
 // @Description  Exclui permanentemente um tenant no sistema usando o UUID ou o Documento (CNPJ/CPF). Pelo menos um dos dois campos deve ser fornecido.
 // @Tags         Tenant
 // @Produce      json
+// @Security     BearerAuth
 //
 // @Param        uuid query string false "UUID do tenant a ser excluído. (Ex: 8871abf3-ed11-4770-b986-e8d98d022d4f)"
 // @Param        document query string false "Documento (CNPJ/CPF) do tenant a ser excluído. (Ex: 12345678901234)"
 //
-// @Success      204  {string} string "Tenant excluído com sucesso (No Content)."
+// @Success      204  {string} string "model.Tenant excluído com sucesso (No Content)."
 // @Failure      400  {object}  rest_err.RestErr    "Requisição inválida (UUID inválido, ou nenhum dos campos 'uuid'/'document' fornecido)."
-// @Failure      404  {object}  rest_err.RestErr    "Tenant não encontrado com os dados fornecidos."
+// @Failure      404  {object}  rest_err.RestErr    "model.Tenant não encontrado com os dados fornecidos."
 // @Failure      500  {object}  rest_err.RestErr    "Erro interno do servidor."
 //
 // @Router       /api/tenant [delete]
@@ -339,7 +401,7 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 		tenantUUID = parsedUUID
 	}
 
-	err := ctrl.service.Delete(c.Request.Context(), Tenant{
+	err := ctrl.service.Delete(c.Request.Context(), model.Tenant{
 		UUID:     tenantUUID,
 		Document: req.Document,
 	})

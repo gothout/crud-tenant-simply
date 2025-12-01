@@ -277,7 +277,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Tenant encontrado com sucesso.",
+                        "description": "model.Tenant encontrado com sucesso.",
                         "schema": {
                             "$ref": "#/definitions/tenant.TenantResponseDto"
                         }
@@ -289,7 +289,7 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "Tenant não encontrado com os dados fornecidos.",
+                        "description": "model.Tenant não encontrado com os dados fornecidos.",
                         "schema": {
                             "$ref": "#/definitions/rest_err.RestErr"
                         }
@@ -303,6 +303,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Exclui permanentemente um tenant no sistema usando o UUID ou o Documento (CNPJ/CPF). Pelo menos um dos dois campos deve ser fornecido.",
                 "produces": [
                     "application/json"
@@ -310,7 +315,7 @@ const docTemplate = `{
                 "tags": [
                     "Tenant"
                 ],
-                "summary": "Deleta um Tenant",
+                "summary": "Deleta um model.Tenant",
                 "parameters": [
                     {
                         "type": "string",
@@ -327,7 +332,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "204": {
-                        "description": "Tenant excluído com sucesso (No Content).",
+                        "description": "model.Tenant excluído com sucesso (No Content).",
                         "schema": {
                             "type": "string"
                         }
@@ -339,7 +344,7 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "Tenant não encontrado com os dados fornecidos.",
+                        "description": "model.Tenant não encontrado com os dados fornecidos.",
                         "schema": {
                             "$ref": "#/definitions/rest_err.RestErr"
                         }
@@ -355,6 +360,11 @@ const docTemplate = `{
         },
         "/api/tenant/create": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Cria um novo tenant no sistema",
                 "consumes": [
                     "application/json"
@@ -458,6 +468,11 @@ const docTemplate = `{
         },
         "/api/tenant/{uuid}": {
             "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Atualiza dados de um tenant existente. O tenant a ser atualizado é identificado pelo UUID no path",
                 "consumes": [
                     "application/json"
@@ -489,7 +504,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Tenant atualizado com sucesso.",
+                        "description": "model.Tenant atualizado com sucesso.",
                         "schema": {
                             "$ref": "#/definitions/tenant.TenantResponseDto"
                         }
@@ -501,7 +516,7 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "Tenant não encontrado para o UUID fornecido.",
+                        "description": "model.Tenant não encontrado para o UUID fornecido.",
                         "schema": {
                             "$ref": "#/definitions/rest_err.RestErr"
                         }
@@ -1026,6 +1041,9 @@ const docTemplate = `{
         "user.UserRole": {
             "type": "string",
             "enum": [
+                "SYSTEM_ADMIN",
+                "TENANT_ADMIN",
+                "TENANT_USER",
                 "SYSTEM_ADMIN",
                 "TENANT_ADMIN",
                 "TENANT_USER"

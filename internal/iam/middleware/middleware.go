@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"tenant-crud-simply/internal/iam/domain/user"
+	"tenant-crud-simply/internal/iam/domain/model"
 	"time"
 
 	"tenant-crud-simply/internal/pkg/rest_err"
@@ -16,7 +16,7 @@ import (
 
 type Middleware interface {
 	SetContextAutorization() gin.HandlerFunc
-	AuthorizeRole(requiredRoles ...user.UserRole) gin.HandlerFunc
+	AuthorizeRole(requiredRoles ...model.UserRole) gin.HandlerFunc
 }
 
 type impl struct {
@@ -70,7 +70,7 @@ func (mw *impl) SetContextAutorization() gin.HandlerFunc {
 	}
 }
 
-func (mw *impl) AuthorizeRole(requiredRoles ...user.UserRole) gin.HandlerFunc {
+func (mw *impl) AuthorizeRole(requiredRoles ...model.UserRole) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		lUser, ok := GetAuthenticatedUser(c)
 
@@ -85,7 +85,6 @@ func (mw *impl) AuthorizeRole(requiredRoles ...user.UserRole) gin.HandlerFunc {
 			for i, role := range requiredRoles {
 				requiredRoleStrings[i] = string(role)
 			}
-
 			e := rest_err.NewForbiddenError(fmt.Sprintf(
 				"Acesso negado. É necessário possuir uma das permissões: %v.",
 				requiredRoleStrings,
@@ -93,12 +92,11 @@ func (mw *impl) AuthorizeRole(requiredRoles ...user.UserRole) gin.HandlerFunc {
 			c.AbortWithStatusJSON(e.Code, e)
 			return
 		}
-
 		c.Next()
 	}
 }
 
-func isRoleAuthorized(userRole user.UserRole, requiredRoles []user.UserRole) bool {
+func isRoleAuthorized(userRole model.UserRole, requiredRoles []model.UserRole) bool {
 	if len(requiredRoles) == 0 {
 		return true
 	}

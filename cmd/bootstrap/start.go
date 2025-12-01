@@ -38,10 +38,11 @@ func Environment() {
 }
 
 func initIamDomain(db *gorm.DB) {
+	middleware.New(db)
 	tenant.New(db)
 	user.New(db)
-	middleware.New(db)
 	auth.New(db)
+
 }
 
 // New prepara a aplicação (config, db, di) e retorna a instância.

@@ -4,8 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"tenant-crud-simply/internal/iam/domain/tenant"
-	"tenant-crud-simply/internal/iam/domain/user"
+	"tenant-crud-simply/internal/iam/domain/model"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,7 +31,7 @@ type loginQueryResult struct {
 	UserName         string         `gorm:"column:user_name"`
 	UserEmail        string         `gorm:"column:user_email"`
 	UserPasswordHash string         `gorm:"column:password_hash"`
-	UserRole         user.UserRole  `gorm:"column:role"`
+	UserRole         model.UserRole `gorm:"column:role"`
 	UserLive         bool           `gorm:"column:live"`
 	UserCreateAt     time.Time      `gorm:"column:create_at"`
 	UserUpdateAt     time.Time      `gorm:"column:update_at"`
@@ -88,7 +87,7 @@ func (r *repositoryImpl) GetLogin(ctx context.Context, token string) (*Login, er
 	}
 
 	login := &Login{
-		User: user.User{
+		User: model.User{
 			UUID:       result.UserUUID,
 			TenantUUID: result.UserTenantUUID,
 			Name:       result.UserName,
@@ -107,7 +106,7 @@ func (r *repositoryImpl) GetLogin(ctx context.Context, token string) (*Login, er
 	}
 
 	if result.UserTenantUUID != nil {
-		tenant := tenant.Tenant{
+		tenant := model.Tenant{
 			UUID:     *result.UserTenantUUID,
 			Name:     result.TenantName.String,
 			Document: result.TenantDocument.String,

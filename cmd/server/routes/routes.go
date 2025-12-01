@@ -6,7 +6,6 @@ import (
 	"tenant-crud-simply/internal/iam/application/auth"
 	"tenant-crud-simply/internal/iam/domain/tenant"
 	"tenant-crud-simply/internal/iam/domain/user"
-	"tenant-crud-simply/internal/iam/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
@@ -55,7 +54,7 @@ func SetupApiRoutes(r *gin.Engine) {
 	if err != nil {
 		panic(err)
 	}
-	tenantController.Routes(route, middleware.MustUse().Middleware.SetContextAutorization())
+	tenantController.Routes(route)
 	userController.Routes(route)
 	authController.Routes(route)
 }
