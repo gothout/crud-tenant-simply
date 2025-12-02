@@ -543,6 +543,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/rest_err.RestErr'
+      security:
+      - BearerAuth: []
       summary: Deleta um Usuário
       tags:
       - User
@@ -577,6 +579,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/rest_err.RestErr'
+      security:
+      - BearerAuth: []
       summary: Busca um Usuário
       tags:
       - User
@@ -621,6 +625,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/rest_err.RestErr'
+      security:
+      - BearerAuth: []
       summary: Atualiza um Usuário
       tags:
       - User
@@ -666,6 +672,8 @@ paths:
           description: Erro interno do servidor.
           schema:
             $ref: '#/definitions/rest_err.RestErr'
+      security:
+      - BearerAuth: []
       summary: Cria um novo Usuário
       tags:
       - User
@@ -695,6 +703,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/rest_err.RestErr'
+      security:
+      - BearerAuth: []
       summary: Lista Usuários
       tags:
       - User

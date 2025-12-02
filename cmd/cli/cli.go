@@ -139,8 +139,7 @@ func Execute() error {
 
 func parseOptions(args []string) (options, error) {
 	var opts options
-
-	fs := pflag.NewFlagSet("tenant-crud", pflag.ContinueOnError)
+	fs := pflag.NewFlagSet("system", pflag.ContinueOnError)
 	fs.BoolVar(&opts.Start, "start", false, "Inicia o servidor HTTP")
 	fs.BoolVar(&opts.Stop, "stop", false, "Finaliza o servidor HTTP")
 	fs.BoolVar(&opts.Seed, "migration-seed", false, "Aplica migrations de seed")

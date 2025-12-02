@@ -2,7 +2,9 @@ package user
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"tenant-crud-simply/internal/iam/domain/tenant"
 	"tenant-crud-simply/internal/iam/middleware"
 	"tenant-crud-simply/internal/pkg/rest_err"
@@ -22,26 +24,26 @@ type Controller interface {
 
 type controllerImpl struct {
 	Service Service
+	mw      middleware.Middleware
 }
 
 func NewController(service Service) Controller {
+	mw := middleware.MustUse().Middleware
 	return &controllerImpl{
 		Service: service,
+		mw:      mw,
 	}
 }
 
 func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 	userGroup := routes.Group("/user")
 
-	// Middleware de autenticação
-	mw := middleware.MustUse().Middleware
-
 	{
-		userGroup.POST("/:identifier", mw.SetContextAutorization(), ctrl.Create)
-		userGroup.GET("", mw.SetContextAutorization(), ctrl.Read)
-		userGroup.GET("/list", mw.SetContextAutorization(), ctrl.List)
-		userGroup.PATCH("/:identifier", mw.SetContextAutorization(), ctrl.Update)
-		userGroup.DELETE("", mw.SetContextAutorization(), ctrl.Delete)
+		userGroup.POST("/:identifier", ctrl.mw.SetContextAutorization(), ctrl.Create)
+		userGroup.GET("", ctrl.mw.SetContextAutorization(), ctrl.Read)
+		userGroup.GET("/list", ctrl.mw.SetContextAutorization(), ctrl.List)
+		userGroup.PATCH("/:identifier", ctrl.mw.SetContextAutorization(), ctrl.Update)
+		userGroup.DELETE("", ctrl.mw.SetContextAutorization(), ctrl.Delete)
 	}
 }
 
@@ -50,6 +52,7 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 // @Tags         User
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 //
 // @Param        identifier path string true "Identificador (UUID ou Documento) do Tenant ao qual o usuário será associado."
 // @Param        request body CreateUserRequestDto true "Objeto do usuário que precisa ser criado."
@@ -76,11 +79,43 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 		return
 	}
 
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
 	var newUser User
-	if err := uuid.Validate(tenantIdentifier); err != nil {
+	switch ctxIdentify.User.Role {
+	case RoleSystemAdmin:
+		if err := uuid.Validate(tenantIdentifier); err != nil {
+			newUser = User{
+				Tenant: tenant.Tenant{
+					Document: tenantIdentifier,
+				},
+				Name:     req.Name,
+				Email:    req.Email,
+				Password: req.Password,
+				Role:     req.Role,
+				Live:     true,
+			}
+		} else {
+			newUser = User{
+				Tenant: tenant.Tenant{
+					UUID: uuid.MustParse(tenantIdentifier),
+				},
+				Name:     req.Name,
+				Email:    req.Email,
+				Password: req.Password,
+				Role:     req.Role,
+				Live:     true,
+			}
+		}
+
+	case RoleTenantAdmin:
 		newUser = User{
 			Tenant: tenant.Tenant{
-				Document: tenantIdentifier,
+				UUID: ctxIdentify.User.Tenant.UUID,
 			},
 			Name:     req.Name,
 			Email:    req.Email,
@@ -88,17 +123,26 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 			Role:     req.Role,
 			Live:     true,
 		}
-	} else {
-		newUser = User{
-			Tenant: tenant.Tenant{
-				UUID: uuid.MustParse(tenantIdentifier),
-			},
-			Name:     req.Name,
-			Email:    req.Email,
-			Password: req.Password,
-			Role:     req.Role,
-			Live:     true,
+		if newUser.Role != RoleTenantAdmin && newUser.Role != RoleTenantUser {
+			restError := rest_err.NewBadRequestError(
+				fmt.Sprintf("invalid user role. Valid roles are: %s, %s", RoleTenantAdmin, RoleTenantUser),
+			)
+			c.JSON(restError.Code, restError)
+			return
 		}
+	default:
+		e := rest_err.NewForbiddenError("Ação não permitida.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
+	if !IsValidUserRole(newUser.Role) {
+		validRolesStr := strings.Join(AllValidRoles, ", ")
+		restError := rest_err.NewBadRequestError(
+			fmt.Sprintf("invalid user role. Valid roles are: %s", validRolesStr),
+		)
+		c.JSON(restError.Code, restError)
+		return
 	}
 
 	userCreated, err := ctrl.Service.Create(c.Request.Context(), newUser)
@@ -140,6 +184,7 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 // @Description  Busca um usuário no sistema usando o UUID ou o Email. Pelo menos um dos dois campos deve ser fornecido.
 // @Tags         User
 // @Produce      json
+// @Security     BearerAuth
 // @Param        uuid   query     string  false  "UUID do usuário"
 // @Param        email  query     string  false  "Email do usuário"
 // @Success      200  {object}  UserResponseDto
@@ -202,6 +247,7 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 // @Description  Retorna uma lista paginada de todos os usuários registrados no sistema.
 // @Tags         User
 // @Produce      json
+// @Security     BearerAuth
 // @Param        page  query     int     false  "Número da página (padrão 1)"
 // @Param        size  query     int     false  "Tamanho da página (padrão 10)"
 // @Success      200  {array}   UserResponseDto
@@ -243,6 +289,7 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 // @Tags         User
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        identifier path      string                true  "Idenficador do usuário"
 // @Param        request    body      UpdateUserRequestDto  true  "Dados para atualização"
 // @Success      200  {object}  UserResponseDto
@@ -297,6 +344,14 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 		Password: req.Password,
 		Role:     req.Role,
 	}
+	if !IsValidUserRole(userToUpdate.Role) {
+		validRolesStr := strings.Join(AllValidRoles, ", ")
+		restError := rest_err.NewBadRequestError(
+			fmt.Sprintf("invalid user role. Valid roles are: %s", validRolesStr),
+		)
+		c.JSON(restError.Code, restError)
+		return
+	}
 
 	updatedUser, err := ctrl.Service.Update(c.Request.Context(), userToUpdate)
 	if err != nil {
@@ -330,6 +385,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 // @Description  Exclui permanentemente um usuário no sistema usando o UUID ou o Email.
 // @Tags         User
 // @Produce      json
+// @Security     BearerAuth
 // @Param        uuid   query     string  false  "UUID do usuário"
 // @Param        email  query     string  false  "Email do usuário"
 // @Success      204  {object}  nil

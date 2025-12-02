@@ -538,6 +538,11 @@ const docTemplate = `{
         },
         "/api/user": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Busca um usuário no sistema usando o UUID ou o Email. Pelo menos um dos dois campos deve ser fornecido.",
                 "produces": [
                     "application/json"
@@ -588,6 +593,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Exclui permanentemente um usuário no sistema usando o UUID ou o Email.",
                 "produces": [
                     "application/json"
@@ -637,6 +647,11 @@ const docTemplate = `{
         },
         "/api/user/list": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Retorna uma lista paginada de todos os usuários registrados no sistema.",
                 "produces": [
                     "application/json"
@@ -680,6 +695,11 @@ const docTemplate = `{
         },
         "/api/user/{identifier}": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Registra um novo usuário no sistema, associado a um tenant (empresa/organização).",
                 "consumes": [
                     "application/json"
@@ -743,6 +763,11 @@ const docTemplate = `{
                 }
             },
             "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Atualiza dados de um usuário existente. O usuário a ser atualizado é identificado pelo UUID no path.",
                 "consumes": [
                     "application/json"
