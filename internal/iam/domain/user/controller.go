@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"tenant-crud-simply/internal/iam/domain/model"
 	"tenant-crud-simply/internal/iam/domain/tenant"
 	"tenant-crud-simply/internal/iam/middleware"
 	"tenant-crud-simply/internal/pkg/rest_err"
@@ -39,11 +40,11 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 	userGroup := routes.Group("/user")
 
 	{
-		userGroup.POST("/:identifier", ctrl.mw.SetContextAutorization(), ctrl.Create)
-		userGroup.GET("", ctrl.mw.SetContextAutorization(), ctrl.Read)
-		userGroup.GET("/list", ctrl.mw.SetContextAutorization(), ctrl.List)
-		userGroup.PATCH("/:identifier", ctrl.mw.SetContextAutorization(), ctrl.Update)
-		userGroup.DELETE("", ctrl.mw.SetContextAutorization(), ctrl.Delete)
+		userGroup.POST("/:identifier", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin), ctrl.Create)
+		userGroup.GET("", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin, model.RoleTenantUser), ctrl.Read)
+		userGroup.GET("/list", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin), ctrl.List)
+		userGroup.PATCH("/:identifier", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin, model.RoleTenantUser), ctrl.Update)
+		userGroup.DELETE("", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin), ctrl.Delete)
 	}
 }
 
