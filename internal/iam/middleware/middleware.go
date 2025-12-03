@@ -74,7 +74,7 @@ func (mw *impl) SetContextAutorization() gin.HandlerFunc {
 		}
 
 		if time.Now().UTC().After(login.AcessToken.Expiry) {
-			e := rest_err.NewForbiddenError(&login.Metadata.RayTraceCode, "Token expirado. Efetue login novamente.")
+			e := rest_err.NewForbiddenError(nil, "Token expirado. Efetue login novamente.")
 			c.Header("X-Request-ID", traceID)
 			c.AbortWithStatusJSON(e.Code, e)
 			return
