@@ -536,115 +536,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/user": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Busca um usuário no sistema usando o UUID ou o Email. Pelo menos um dos dois campos deve ser fornecido.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "User"
-                ],
-                "summary": "Busca um Usuário",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "UUID do usuário",
-                        "name": "uuid",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Email do usuário",
-                        "name": "email",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/user.UserResponseDto"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/rest_err.RestErr"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/rest_err.RestErr"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/rest_err.RestErr"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Exclui permanentemente um usuário no sistema usando o UUID ou o Email.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "User"
-                ],
-                "summary": "Deleta um Usuário",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "UUID do usuário",
-                        "name": "uuid",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Email do usuário",
-                        "name": "email",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/rest_err.RestErr"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/rest_err.RestErr"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/rest_err.RestErr"
-                        }
-                    }
-                }
-            }
-        },
         "/api/user/list": {
             "get": {
                 "security": [
@@ -700,6 +591,61 @@ const docTemplate = `{
             }
         },
         "/api/user/{identifier}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Busca um usuário. Se o identificador for passado na URL, busca aquele usuário específico. Se for vazio (/api/user), busca o perfil do usuário logado.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Busca um Usuário",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID ou Email do usuário (Opcional)",
+                        "name": "identifier",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user.UserResponseDto"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -762,6 +708,59 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Erro interno do servidor.",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Exclui permanentemente um usuário no sistema usando o UUID ou o Email passado na URL.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "User"
+                ],
+                "summary": "Deleta um Usuário",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID ou Email do usuário a ser deletado",
+                        "name": "identifier",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/rest_err.RestErr"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/rest_err.RestErr"
                         }

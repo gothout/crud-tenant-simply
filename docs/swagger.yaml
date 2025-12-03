@@ -513,18 +513,15 @@ paths:
       summary: Lista Tenants
       tags:
       - Tenant
-  /api/user:
+  /api/user/{identifier}:
     delete:
       description: Exclui permanentemente um usuário no sistema usando o UUID ou o
-        Email.
+        Email passado na URL.
       parameters:
-      - description: UUID do usuário
-        in: query
-        name: uuid
-        type: string
-      - description: Email do usuário
-        in: query
-        name: email
+      - description: UUID ou Email do usuário a ser deletado
+        in: path
+        name: identifier
+        required: true
         type: string
       produces:
       - application/json
@@ -533,6 +530,10 @@ paths:
           description: No Content
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/rest_err.RestErr'
         "404":
@@ -549,16 +550,13 @@ paths:
       tags:
       - User
     get:
-      description: Busca um usuário no sistema usando o UUID ou o Email. Pelo menos
-        um dos dois campos deve ser fornecido.
+      description: Busca um usuário. Se o identificador for passado na URL, busca
+        aquele usuário específico. Se for vazio (/api/user), busca o perfil do usuário
+        logado.
       parameters:
-      - description: UUID do usuário
-        in: query
-        name: uuid
-        type: string
-      - description: Email do usuário
-        in: query
-        name: email
+      - description: UUID ou Email do usuário (Opcional)
+        in: path
+        name: identifier
         type: string
       produces:
       - application/json
@@ -569,6 +567,10 @@ paths:
             $ref: '#/definitions/user.UserResponseDto'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/rest_err.RestErr'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/rest_err.RestErr'
         "404":
@@ -584,7 +586,6 @@ paths:
       summary: Busca um Usuário
       tags:
       - User
-  /api/user/{identifier}:
     patch:
       consumes:
       - application/json

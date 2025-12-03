@@ -14,11 +14,6 @@ type UpdateUserRequestDto struct {
 	Role     UserRole `json:"role"`
 }
 
-type ReadUserRequestDto struct {
-	UUID  string `form:"uuid"`
-	Email string `form:"email"`
-}
-
 type ListUserRequestDto struct {
 	Page             int    `form:"page"`
 	PageSize         int    `form:"size"`

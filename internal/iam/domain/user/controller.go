@@ -42,9 +42,10 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 	{
 		userGroup.POST("/:identifier", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin), ctrl.Create)
 		userGroup.GET("", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin, model.RoleTenantUser), ctrl.Read)
+		userGroup.GET("/:identifier", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin, model.RoleTenantUser), ctrl.Read)
 		userGroup.GET("/list", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin), ctrl.List)
 		userGroup.PATCH("/:identifier", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin, model.RoleTenantUser), ctrl.Update)
-		userGroup.DELETE("", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin), ctrl.Delete)
+		userGroup.DELETE("/:identifier", ctrl.mw.SetContextAutorization(), ctrl.mw.AuthorizeRole(model.RoleSystemAdmin, model.RoleTenantAdmin), ctrl.Delete)
 	}
 }
 
@@ -182,43 +183,18 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 }
 
 // @Summary      Busca um Usuário
-// @Description  Busca um usuário no sistema usando o UUID ou o Email. Pelo menos um dos dois campos deve ser fornecido.
+// @Description  Busca um usuário. Se o identificador for passado na URL, busca aquele usuário específico. Se for vazio (/api/user), busca o perfil do usuário logado.
 // @Tags         User
 // @Produce      json
 // @Security     BearerAuth
-// @Param        uuid   query     string  false  "UUID do usuário"
-// @Param        email  query     string  false  "Email do usuário"
+// @Param        identifier path      string  false  "UUID ou Email do usuário (Opcional)"
 // @Success      200  {object}  UserResponseDto
 // @Failure      400  {object}  rest_err.RestErr
+// @Failure      403  {object}  rest_err.RestErr
 // @Failure      404  {object}  rest_err.RestErr
 // @Failure      500  {object}  rest_err.RestErr
-// @Router       /api/user [get]
+// @Router       /api/user/{identifier} [get]
 func (ctrl *controllerImpl) Read(c *gin.Context) {
-	var req ReadUserRequestDto
-	if err := c.ShouldBindQuery(&req); err != nil {
-		restError := rest_err.NewBadRequestError("invalid query parameters")
-		c.JSON(restError.Code, restError)
-		return
-	}
-
-	if req.UUID == "" && req.Email == "" {
-		restError := rest_err.NewBadRequestError("uuid or email is required")
-		c.JSON(restError.Code, restError)
-		return
-	}
-
-	userToFind := User{}
-	if req.UUID != "" {
-		if err := uuid.Validate(req.UUID); err != nil {
-			restError := rest_err.NewBadRequestError("invalid uuid")
-			c.JSON(restError.Code, restError)
-			return
-		}
-		userToFind.UUID = uuid.MustParse(req.UUID)
-	} else {
-		userToFind.Email = req.Email
-	}
-
 	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
 	if !ok {
 		e := rest_err.NewForbiddenError("Usuário não autenticado.")
@@ -226,23 +202,27 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		return
 	}
 
-	switch ctxIdentify.User.Role {
-	case model.RoleSystemAdmin:
-		//
-	case model.RoleTenantAdmin:
-		//
-	case model.RoleTenantUser:
-		userToFind.Email = ""
+	identificador := c.Param("identifier")
+	if identificador == "undefined" || identificador == "null" {
+		identificador = ""
+	}
+	userToFind := User{}
+
+	if identificador == "" {
+		// --- CASO 1: Leitura do Próprio Usuário (Self) ---
 		userToFind.UUID = ctxIdentify.User.UUID
-	default:
-		e := rest_err.NewForbiddenError("Ação não permitida.")
-		c.AbortWithStatusJSON(e.Code, e)
-		return
+	} else {
+		// --- CASO 2: Leitura de Usuário Específico ---
+		if err := uuid.Validate(identificador); err == nil {
+			userToFind.UUID = uuid.MustParse(identificador)
+		} else {
+			userToFind.Email = identificador
+		}
 	}
 
 	userFound, err := ctrl.Service.Read(c.Request.Context(), userToFind)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, ErrNotFound) || errors.Is(err, tenant.ErrNotFound) {
 			restError := rest_err.NewNotFoundError("user not found")
 			c.JSON(restError.Code, restError)
 			return
@@ -251,12 +231,32 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		c.JSON(restError.Code, restError)
 		return
 	}
-	if ctxIdentify.User.Role == model.RoleTenantAdmin {
-		if userFound.Tenant.UUID != ctxIdentify.User.Tenant.UUID {
-			e := rest_err.NewForbiddenError("Ação não permitida.")
+
+	switch ctxIdentify.User.Role {
+	case model.RoleSystemAdmin:
+		// SystemAdmin vê tudo. Permissão concedida.
+
+	case model.RoleTenantAdmin:
+		// TenantAdmin só vê usuários do MESMO tenant.
+		if userFound.Tenant.UUID.String() != ctxIdentify.User.Tenant.UUID.String() {
+			e := rest_err.NewForbiddenError("Você não tem permissão para visualizar usuários de outro tenant.")
 			c.AbortWithStatusJSON(e.Code, e)
 			return
 		}
+
+	case model.RoleTenantUser:
+		// TenantUser só pode ver a SI MESMO.
+		// Comparamos o UUID do banco com o UUID do token.
+		if userFound.UUID.String() != ctxIdentify.User.UUID.String() {
+			e := rest_err.NewForbiddenError("Você não tem permissão para visualizar dados de outros usuários.")
+			c.AbortWithStatusJSON(e.Code, e)
+			return
+		}
+
+	default:
+		e := rest_err.NewForbiddenError("Ação não permitida.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
 	}
 
 	response := UserResponseDto{
@@ -496,59 +496,82 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 }
 
 // @Summary      Deleta um Usuário
-// @Description  Exclui permanentemente um usuário no sistema usando o UUID ou o Email.
+// @Description  Exclui permanentemente um usuário no sistema usando o UUID ou o Email passado na URL.
 // @Tags         User
 // @Produce      json
 // @Security     BearerAuth
-// @Param        uuid   query     string  false  "UUID do usuário"
-// @Param        email  query     string  false  "Email do usuário"
+// @Param        identifier path      string  true  "UUID ou Email do usuário a ser deletado"
 // @Success      204  {object}  nil
 // @Failure      400  {object}  rest_err.RestErr
+// @Failure      403  {object}  rest_err.RestErr
 // @Failure      404  {object}  rest_err.RestErr
 // @Failure      500  {object}  rest_err.RestErr
-// @Router       /api/user [delete]
+// @Router       /api/user/{identifier} [delete]
 func (ctrl *controllerImpl) Delete(c *gin.Context) {
-	var req ReadUserRequestDto
-	if err := c.ShouldBindQuery(&req); err != nil {
-		restError := rest_err.NewBadRequestError("invalid query parameters")
+	identificador := c.Param("identifier")
+	if identificador == "" {
+		restError := rest_err.NewBadRequestError("identifier parameter is required")
 		c.JSON(restError.Code, restError)
 		return
 	}
 
-	if req.UUID == "" && req.Email == "" {
-		restError := rest_err.NewBadRequestError("uuid or email is required")
-		c.JSON(restError.Code, restError)
-		return
-	}
-
-	userToDelete := User{}
-	if req.UUID != "" {
-		if err := uuid.Validate(req.UUID); err != nil {
-			restError := rest_err.NewBadRequestError("invalid uuid")
-			c.JSON(restError.Code, restError)
-			return
-		}
-		userToDelete.UUID = uuid.MustParse(req.UUID)
+	// 1. Determina se é UUID ou Email e prepara busca
+	userToFind := User{}
+	if err := uuid.Validate(identificador); err == nil {
+		userToFind.UUID = uuid.MustParse(identificador)
 	} else {
-		userToDelete.Email = req.Email
+		userToFind.Email = identificador
 	}
 
-	if userToDelete.UUID == uuid.Nil {
-		found, err := ctrl.Service.Read(c.Request.Context(), userToDelete)
-		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				restError := rest_err.NewNotFoundError("user not found")
-				c.JSON(restError.Code, restError)
-				return
-			}
-			restError := rest_err.NewInternalServerError("internal server error", nil)
+	// 2. Busca usuário ALVO no banco (Segurança: precisamos saber o Tenant dele)
+	targetUser, err := ctrl.Service.Read(c.Request.Context(), userToFind)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) || errors.Is(err, tenant.ErrNotFound) {
+			restError := rest_err.NewNotFoundError("user not found")
 			c.JSON(restError.Code, restError)
 			return
 		}
-		userToDelete = found
+		restError := rest_err.NewInternalServerError("internal server error", nil)
+		c.JSON(restError.Code, restError)
+		return
 	}
 
-	err := ctrl.Service.Delete(c.Request.Context(), userToDelete)
+	// 3. Autenticação e Autorização
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
+	switch ctxIdentify.User.Role {
+	case model.RoleSystemAdmin:
+		// SystemAdmin deleta qualquer um.
+
+	case model.RoleTenantAdmin:
+		// TenantAdmin só deleta do MESMO tenant
+		if targetUser.Tenant.UUID.String() != ctxIdentify.User.Tenant.UUID.String() {
+			e := rest_err.NewForbiddenError("Você não tem permissão para deletar usuários de outro tenant.")
+			c.AbortWithStatusJSON(e.Code, e)
+			return
+		}
+
+	case model.RoleTenantUser:
+		// TenantUser só deleta a SI MESMO
+		if targetUser.UUID.String() != ctxIdentify.User.UUID.String() {
+			e := rest_err.NewForbiddenError("Você não tem permissão para deletar outros usuários.")
+			c.AbortWithStatusJSON(e.Code, e)
+			return
+		}
+
+	default:
+		e := rest_err.NewForbiddenError("Ação não permitida.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
+	// 4. Executa Delete
+	err = ctrl.Service.Delete(c.Request.Context(), targetUser)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			restError := rest_err.NewNotFoundError("user not found")
