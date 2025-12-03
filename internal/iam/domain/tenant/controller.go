@@ -128,13 +128,13 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 func (ctrl *controllerImpl) Read(c *gin.Context) {
 	var req ReadTenantRequestDto
 	if err := c.ShouldBindQuery(&req); err != nil {
-		restError := rest_err.NewBadRequestError("Parâmetros de busca inválidos.")
+		restError := rest_err.NewBadRequestError(nil, "Parâmetros de busca inválidos.")
 		c.JSON(restError.Code, restError)
 		return
 	}
 
 	if req.UUID == "" && req.Document == "" {
-		restError := rest_err.NewBadRequestError("É necessário fornecer o 'uuid' OU o 'document' para a busca.")
+		restError := rest_err.NewBadRequestError(nil, "É necessário fornecer o 'uuid' OU o 'document' para a busca.")
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -145,7 +145,7 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		parsedUUID, err := uuid.Parse(req.UUID)
 		if err != nil {
 			// Captura erro de UUID mal formatado (retorna 400)
-			restError := rest_err.NewBadRequestError("O UUID fornecido não é um formato válido.")
+			restError := rest_err.NewBadRequestError(nil, "O UUID fornecido não é um formato válido.")
 			c.JSON(restError.Code, restError)
 			return
 		}
@@ -154,7 +154,7 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 
 	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
 	if !ok {
-		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
@@ -176,7 +176,7 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		}
 
 	default:
-		e := rest_err.NewForbiddenError("Ação não permitida.")
+		e := rest_err.NewForbiddenError(nil, "Ação não permitida.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
@@ -187,13 +187,13 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		switch err {
 		case ErrNotFound:
 			// Tratamento para 404
-			restError = rest_err.NewNotFoundError(ErrNotFound.Error())
+			restError = rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, ErrNotFound.Error())
 		case ErrInvalidInput:
 			// Tratamento para 400 (Assumindo que InvalidInput no Read é uma falha na query/dados)
-			restError = rest_err.NewBadRequestError(ErrInvalidInput.Error())
+			restError = rest_err.NewBadRequestError(&ctxIdentify.Metadata.RayTraceCode, ErrInvalidInput.Error())
 		default:
 			// Tratamento para 500
-			restError = rest_err.NewInternalServerError("Falha ao buscar tenant", nil)
+			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao buscar tenant", nil)
 		}
 
 		c.JSON(restError.Code, restError)
@@ -227,21 +227,27 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 func (ctrl *controllerImpl) List(c *gin.Context) {
 	var req ListTenantRequestDto
 	if err := c.ShouldBindQuery(&req); err != nil {
-		restError := rest_err.NewBadRequestError("Parâmetros de busca inválidos. Verifique 'page' e 'pageSize'.")
+		restError := rest_err.NewBadRequestError(nil, "Parâmetros de busca inválidos. Verifique 'page' e 'pageSize'.")
 		c.JSON(restError.Code, restError)
 		return
 	}
 
 	if req.PageSize > 100 {
-		restError := rest_err.NewBadRequestError("É permitido um máximo de 100 listagens por página.")
+		restError := rest_err.NewBadRequestError(nil, "É permitido um máximo de 100 listagens por página.")
 		c.JSON(restError.Code, restError)
+		return
+	}
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
 
 	lTenants, err := ctrl.service.List(c.Request.Context(), req.Page, req.PageSize)
 	if err != nil {
 		var restError *rest_err.RestErr
-		restError = rest_err.NewInternalServerError("Falha ao buscar tenants", nil)
+		restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao buscar tenants", nil)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -285,14 +291,14 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 	uuidStr := c.Param("uuid")
 	tenantUUID, err := uuid.Parse(uuidStr)
 	if err != nil {
-		restError := rest_err.NewBadRequestError("O UUID fornecido na URL não é um formato válido.")
+		restError := rest_err.NewBadRequestError(nil, "O UUID fornecido na URL não é um formato válido.")
 		c.JSON(restError.Code, restError)
 		return
 	}
 
 	var request UpdateTenantRequestDto
 	if err := c.ShouldBindJSON(&request); err != nil {
-		restError := rest_err.NewBadRequestError("Corpo JSON inválido ou mal formatado.")
+		restError := rest_err.NewBadRequestError(nil, "Corpo JSON inválido ou mal formatado.")
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -307,7 +313,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 
 	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
 	if !ok {
-		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
@@ -326,7 +332,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 		}
 
 	default:
-		e := rest_err.NewForbiddenError("Ação não permitida.")
+		e := rest_err.NewForbiddenError(nil, "Ação não permitida.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
@@ -338,13 +344,13 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 
 		switch err {
 		case ErrNotFound:
-			restError = rest_err.NewNotFoundError(ErrNotFound.Error())
+			restError = rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, ErrNotFound.Error())
 		case ErrDocumentDuplicated:
-			restError = rest_err.NewConflictValidationError("O novo documento fornecido já está em uso por outro ", nil)
+			restError = rest_err.NewConflictValidationError(&ctxIdentify.Metadata.RayTraceCode, "O novo documento fornecido já está em uso por outro ", nil)
 		case ErrInvalidInput:
-			restError = rest_err.NewBadRequestError(ErrInvalidInput.Error())
+			restError = rest_err.NewBadRequestError(&ctxIdentify.Metadata.RayTraceCode, ErrInvalidInput.Error())
 		default:
-			restError = rest_err.NewInternalServerError("Falha ao atualizar tenant", nil)
+			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao atualizar tenant", nil)
 		}
 
 		c.JSON(restError.Code, restError)
@@ -379,13 +385,13 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 func (ctrl *controllerImpl) Delete(c *gin.Context) {
 	var req ReadTenantRequestDto
 	if err := c.ShouldBindQuery(&req); err != nil {
-		restError := rest_err.NewBadRequestError("Parâmetros de busca inválidos.")
+		restError := rest_err.NewBadRequestError(nil, "Parâmetros de busca inválidos.")
 		c.JSON(restError.Code, restError)
 		return
 	}
 
 	if req.UUID == "" && req.Document == "" {
-		restError := rest_err.NewBadRequestError("É necessário fornecer o 'uuid' OU o 'document' para a exclusão.")
+		restError := rest_err.NewBadRequestError(nil, "É necessário fornecer o 'uuid' OU o 'document' para a exclusão.")
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -394,11 +400,17 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 	if req.UUID != "" {
 		parsedUUID, err := uuid.Parse(req.UUID)
 		if err != nil {
-			restError := rest_err.NewBadRequestError("O UUID fornecido não é um formato válido.")
+			restError := rest_err.NewBadRequestError(nil, "O UUID fornecido não é um formato válido.")
 			c.JSON(restError.Code, restError)
 			return
 		}
 		tenantUUID = parsedUUID
+	}
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
 	}
 
 	err := ctrl.service.Delete(c.Request.Context(), model.Tenant{
@@ -410,11 +422,11 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 		var restError *rest_err.RestErr
 		switch err {
 		case ErrNotFound:
-			restError = rest_err.NewNotFoundError(ErrNotFound.Error())
+			restError = rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, ErrNotFound.Error())
 		case ErrInvalidInput:
-			restError = rest_err.NewBadRequestError(ErrInvalidInput.Error())
+			restError = rest_err.NewBadRequestError(&ctxIdentify.Metadata.RayTraceCode, ErrInvalidInput.Error())
 		default:
-			restError = rest_err.NewInternalServerError("Falha ao excluir tenant", nil)
+			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao excluir tenant", nil)
 		}
 
 		c.JSON(restError.Code, restError)

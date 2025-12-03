@@ -58,7 +58,7 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 func (ctrl *controllerImpl) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		restErr := rest_err.NewBadRequestError("invalid json body")
+		restErr := rest_err.NewBadRequestError(nil, "invalid json body")
 		c.JSON(restErr.Code, restErr)
 		return
 	}
@@ -68,13 +68,13 @@ func (ctrl *controllerImpl) Login(c *gin.Context) {
 		var restError *rest_err.RestErr
 		switch {
 		case errors.Is(err, ErrPwdWrong):
-			restError = rest_err.NewNotFoundError(err.Error())
+			restError = rest_err.NewNotFoundError(nil, err.Error())
 
 		case errors.Is(err, ErrTokenDuplicated):
-			restError = rest_err.NewConflictValidationError(err.Error(), nil)
+			restError = rest_err.NewConflictValidationError(nil, err.Error(), nil)
 
 		default:
-			restError = rest_err.NewInternalServerError("internal server error", nil)
+			restError = rest_err.NewInternalServerError(nil, "internal server error", nil)
 		}
 
 		c.JSON(restError.Code, restError)
@@ -112,7 +112,7 @@ func (ctrl *controllerImpl) Login(c *gin.Context) {
 func (ctrl *controllerImpl) Logout(c *gin.Context) {
 	token := c.Param("token")
 	if err := ctrl.Service.RevokeAcessToken(c.Request.Context(), token); err != nil {
-		restErr := rest_err.NewForbiddenError("user not authorized")
+		restErr := rest_err.NewForbiddenError(nil, "user not authorized")
 		c.JSON(restErr.Code, restErr)
 		return
 	}
@@ -134,7 +134,7 @@ func (ctrl *controllerImpl) CreateOTP(c *gin.Context) {
 	var req OTPRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		restErr := rest_err.NewBadRequestError("invalid json body")
+		restErr := rest_err.NewBadRequestError(nil, "invalid json body")
 		c.JSON(restErr.Code, restErr)
 		return
 	}
@@ -144,14 +144,14 @@ func (ctrl *controllerImpl) CreateOTP(c *gin.Context) {
 
 		switch {
 		case errors.Is(err, OTPCodeExist):
-			restErr = rest_err.NewConflictValidationError(err.Error(), nil)
+			restErr = rest_err.NewConflictValidationError(nil, err.Error(), nil)
 		case errors.Is(err, user.ErrNotFound):
-			restErr = rest_err.NewNotFoundError(err.Error())
+			restErr = rest_err.NewNotFoundError(nil, err.Error())
 		case errors.Is(err, mailer.ErrMailerNotInitialized):
 			causes := []rest_err.Causes{rest_err.NewCause("Mailer", "mailer not initialized")}
-			restErr = rest_err.NewInternalServerError("internal server error", causes)
+			restErr = rest_err.NewInternalServerError(nil, "internal server error", causes)
 		default:
-			restErr = rest_err.NewInternalServerError("internal server error", nil)
+			restErr = rest_err.NewInternalServerError(nil, "internal server error", nil)
 		}
 
 		c.JSON(restErr.Code, restErr)
@@ -176,7 +176,7 @@ func (ctrl *controllerImpl) ResetPassword(c *gin.Context) {
 	var req OTPResetPasswordRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		restErr := rest_err.NewBadRequestError("invalid json body")
+		restErr := rest_err.NewBadRequestError(nil, "invalid json body")
 		c.JSON(restErr.Code, restErr)
 		return
 	}
@@ -192,9 +192,9 @@ func (ctrl *controllerImpl) ResetPassword(c *gin.Context) {
 
 		switch {
 		case errors.Is(err, OTPCodeWrong):
-			restErr = rest_err.NewForbiddenError(err.Error())
+			restErr = rest_err.NewForbiddenError(nil, err.Error())
 		default:
-			restErr = rest_err.NewInternalServerError("internal server error", nil)
+			restErr = rest_err.NewInternalServerError(nil, "internal server error", nil)
 		}
 
 		c.JSON(restErr.Code, restErr)
@@ -203,7 +203,7 @@ func (ctrl *controllerImpl) ResetPassword(c *gin.Context) {
 
 	if !ok {
 		// fallback defensivo, teoricamente não deveria cair aqui
-		restErr := rest_err.NewInternalServerError("could not change password", nil)
+		restErr := rest_err.NewInternalServerError(nil, "could not change password", nil)
 		c.JSON(restErr.Code, restErr)
 		return
 	}
@@ -223,7 +223,7 @@ func (ctrl *controllerImpl) ResetPassword(c *gin.Context) {
 func (ctrl *controllerImpl) Healthcheck(c *gin.Context) {
 	lUser, ok := middleware.GetAuthenticatedUser(c)
 	if !ok {
-		restErr := rest_err.NewForbiddenError("user not authorized")
+		restErr := rest_err.NewForbiddenError(nil, "user not authorized")
 		c.JSON(restErr.Code, restErr)
 		return
 	}

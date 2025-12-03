@@ -69,21 +69,21 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 func (ctrl *controllerImpl) Create(c *gin.Context) {
 	tenantIdentifier := c.Param("identifier")
 	if tenantIdentifier == "" {
-		restError := rest_err.NewBadRequestError("tenant identifier is required in URL path")
+		restError := rest_err.NewBadRequestError(nil, "tenant identifier is required in URL path")
 		c.JSON(restError.Code, restError)
 		return
 	}
 
 	var req CreateUserRequestDto
 	if err := c.ShouldBindJSON(&req); err != nil {
-		restError := rest_err.NewBadRequestError("invalid json body")
+		restError := rest_err.NewBadRequestError(nil, "invalid json body")
 		c.JSON(restError.Code, restError)
 		return
 	}
 
 	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
 	if !ok {
-		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
@@ -126,21 +126,21 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 			Live:     true,
 		}
 		if newUser.Role != RoleTenantAdmin && newUser.Role != RoleTenantUser {
-			restError := rest_err.NewBadRequestError(
+			restError := rest_err.NewBadRequestError(&ctxIdentify.Metadata.RayTraceCode,
 				fmt.Sprintf("invalid user role. Valid roles are: %s, %s", RoleTenantAdmin, RoleTenantUser),
 			)
 			c.JSON(restError.Code, restError)
 			return
 		}
 	default:
-		e := rest_err.NewForbiddenError("Ação não permitida.")
+		e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Ação não permitida.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
 
 	if !IsValidUserRole(newUser.Role) {
 		validRolesStr := strings.Join(AllValidRoles, ", ")
-		restError := rest_err.NewBadRequestError(
+		restError := rest_err.NewBadRequestError(&ctxIdentify.Metadata.RayTraceCode,
 			fmt.Sprintf("invalid user role. Valid roles are: %s", validRolesStr),
 		)
 		c.JSON(restError.Code, restError)
@@ -153,16 +153,16 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 		var restError *rest_err.RestErr
 		switch {
 		case errors.Is(err, tenant.ErrNotFound):
-			restError = rest_err.NewNotFoundError(err.Error())
+			restError = rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, err.Error())
 
 		case errors.Is(err, ErrEmailDuplicated):
-			restError = rest_err.NewConflictValidationError(err.Error(), nil)
+			restError = rest_err.NewConflictValidationError(&ctxIdentify.Metadata.RayTraceCode, err.Error(), nil)
 
 		case errors.Is(err, ErrInvalidInput):
-			restError = rest_err.NewBadRequestError(err.Error())
+			restError = rest_err.NewBadRequestError(&ctxIdentify.Metadata.RayTraceCode, err.Error())
 
 		default:
-			restError = rest_err.NewInternalServerError("internal server error", nil)
+			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
 		}
 
 		c.JSON(restError.Code, restError)
@@ -197,7 +197,7 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 func (ctrl *controllerImpl) Read(c *gin.Context) {
 	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
 	if !ok {
-		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
@@ -223,11 +223,11 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 	userFound, err := ctrl.Service.Read(c.Request.Context(), userToFind)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) || errors.Is(err, tenant.ErrNotFound) {
-			restError := rest_err.NewNotFoundError("user not found")
+			restError := rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "user not found")
 			c.JSON(restError.Code, restError)
 			return
 		}
-		restError := rest_err.NewInternalServerError("internal server error", nil)
+		restError := rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -239,7 +239,7 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 	case model.RoleTenantAdmin:
 		// TenantAdmin só vê usuários do MESMO tenant.
 		if userFound.Tenant.UUID.String() != ctxIdentify.User.Tenant.UUID.String() {
-			e := rest_err.NewForbiddenError("Você não tem permissão para visualizar usuários de outro tenant.")
+			e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Você não tem permissão para visualizar usuários de outro tenant.")
 			c.AbortWithStatusJSON(e.Code, e)
 			return
 		}
@@ -248,13 +248,13 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		// TenantUser só pode ver a SI MESMO.
 		// Comparamos o UUID do banco com o UUID do token.
 		if userFound.UUID.String() != ctxIdentify.User.UUID.String() {
-			e := rest_err.NewForbiddenError("Você não tem permissão para visualizar dados de outros usuários.")
+			e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Você não tem permissão para visualizar dados de outros usuários.")
 			c.AbortWithStatusJSON(e.Code, e)
 			return
 		}
 
 	default:
-		e := rest_err.NewForbiddenError("Ação não permitida.")
+		e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Ação não permitida.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
@@ -286,14 +286,14 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 func (ctrl *controllerImpl) List(c *gin.Context) {
 	var req ListUserRequestDto
 	if err := c.ShouldBindQuery(&req); err != nil {
-		restError := rest_err.NewBadRequestError("invalid query parameters")
+		restError := rest_err.NewBadRequestError(nil, "invalid query parameters")
 		c.JSON(restError.Code, restError)
 		return
 	}
 
 	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
 	if !ok {
-		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
@@ -319,19 +319,19 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 		users, err = ctrl.Service.ListByTenant(c, ctxIdentify.User.Tenant, req.Page, req.PageSize)
 
 	default:
-		e := rest_err.NewForbiddenError("Ação não permitida.")
+		e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Ação não permitida.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
 
 	if err != nil {
 		if errors.Is(err, tenant.ErrNotFound) {
-			restError := rest_err.NewNotFoundError("tenant not found")
+			restError := rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "tenant not found")
 			c.JSON(restError.Code, restError)
 			return
 		}
 
-		restError := rest_err.NewInternalServerError("internal server error", nil)
+		restError := rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -376,7 +376,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 
 	var req UpdateUserRequestDto
 	if err := c.ShouldBindJSON(&req); err != nil {
-		restError := rest_err.NewBadRequestError("invalid json body")
+		restError := rest_err.NewBadRequestError(nil, "invalid json body")
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -388,22 +388,21 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 		userToFind.Email = identificador
 	}
 
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
 	targetUser, err := ctrl.Service.Read(c.Request.Context(), userToFind)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) || errors.Is(err, tenant.ErrNotFound) {
-			restError := rest_err.NewNotFoundError("user not found")
+			restError := rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "user not found")
 			c.JSON(restError.Code, restError)
 			return
 		}
-		restError := rest_err.NewInternalServerError("internal server error", nil)
+		restError := rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
 		c.JSON(restError.Code, restError)
-		return
-	}
-
-	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
-	if !ok {
-		e := rest_err.NewForbiddenError("Usuário não autenticado.")
-		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
 
@@ -420,18 +419,18 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 
 	case model.RoleTenantAdmin:
 		if targetUser.TenantUUID.String() != ctxIdentify.User.Tenant.UUID.String() {
-			e := rest_err.NewForbiddenError("Você não tem permissão para alterar usuários de outro tenant.")
+			e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Você não tem permissão para alterar usuários de outro tenant.")
 			c.AbortWithStatusJSON(e.Code, e)
 			return
 		}
 		if req.Role != "" {
 			if req.Role == model.RoleSystemAdmin {
-				e := rest_err.NewForbiddenError("Tenant Admin não pode atribuir permissão de System Admin.")
+				e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Tenant Admin não pode atribuir permissão de System Admin.")
 				c.AbortWithStatusJSON(e.Code, e)
 				return
 			}
 			if req.Role != model.RoleTenantAdmin && req.Role != model.RoleTenantUser {
-				e := rest_err.NewBadRequestError("Role inválida para Tenant Admin.")
+				e := rest_err.NewBadRequestError(&ctxIdentify.Metadata.RayTraceCode, "Role inválida para Tenant Admin.")
 				c.JSON(e.Code, e)
 				return
 			}
@@ -440,14 +439,14 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 
 	case model.RoleTenantUser:
 		if targetUser.UUID != ctxIdentify.User.UUID {
-			e := rest_err.NewForbiddenError("Você só pode alterar seus próprios dados.")
+			e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Você só pode alterar seus próprios dados.")
 			c.AbortWithStatusJSON(e.Code, e)
 			return
 		}
 		userToUpdate.Role = ""
 
 	default:
-		e := rest_err.NewForbiddenError("Ação não permitida.")
+		e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Ação não permitida.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
@@ -459,7 +458,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 	if userToUpdate.Role != "" {
 		if !IsValidUserRole(userToUpdate.Role) {
 			validRolesStr := strings.Join(AllValidRoles, ", ")
-			restError := rest_err.NewBadRequestError(
+			restError := rest_err.NewBadRequestError(&ctxIdentify.Metadata.RayTraceCode,
 				fmt.Sprintf("invalid user role. Valid roles are: %s", validRolesStr),
 			)
 			c.JSON(restError.Code, restError)
@@ -472,11 +471,11 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 		var restError *rest_err.RestErr
 		switch {
 		case errors.Is(err, ErrNotFound):
-			restError = rest_err.NewNotFoundError("user not found")
+			restError = rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "user not found")
 		case errors.Is(err, ErrEmailDuplicated):
-			restError = rest_err.NewConflictValidationError(err.Error(), nil)
+			restError = rest_err.NewConflictValidationError(&ctxIdentify.Metadata.RayTraceCode, err.Error(), nil)
 		default:
-			restError = rest_err.NewInternalServerError("internal server error", nil)
+			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
 		}
 		c.JSON(restError.Code, restError)
 		return
@@ -510,7 +509,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 func (ctrl *controllerImpl) Delete(c *gin.Context) {
 	identificador := c.Param("identifier")
 	if identificador == "" {
-		restError := rest_err.NewBadRequestError("identifier parameter is required")
+		restError := rest_err.NewBadRequestError(nil, "identifier parameter is required")
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -522,25 +521,23 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 	} else {
 		userToFind.Email = identificador
 	}
-
+	// 3. Autenticação e Autorização
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
 	// 2. Busca usuário ALVO no banco (Segurança: precisamos saber o Tenant dele)
 	targetUser, err := ctrl.Service.Read(c.Request.Context(), userToFind)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) || errors.Is(err, tenant.ErrNotFound) {
-			restError := rest_err.NewNotFoundError("user not found")
+			restError := rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "user not found")
 			c.JSON(restError.Code, restError)
 			return
 		}
-		restError := rest_err.NewInternalServerError("internal server error", nil)
+		restError := rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
 		c.JSON(restError.Code, restError)
-		return
-	}
-
-	// 3. Autenticação e Autorização
-	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
-	if !ok {
-		e := rest_err.NewForbiddenError("Usuário não autenticado.")
-		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
 
@@ -551,7 +548,7 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 	case model.RoleTenantAdmin:
 		// TenantAdmin só deleta do MESMO tenant
 		if targetUser.Tenant.UUID.String() != ctxIdentify.User.Tenant.UUID.String() {
-			e := rest_err.NewForbiddenError("Você não tem permissão para deletar usuários de outro tenant.")
+			e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Você não tem permissão para deletar usuários de outro tenant.")
 			c.AbortWithStatusJSON(e.Code, e)
 			return
 		}
@@ -559,13 +556,13 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 	case model.RoleTenantUser:
 		// TenantUser só deleta a SI MESMO
 		if targetUser.UUID.String() != ctxIdentify.User.UUID.String() {
-			e := rest_err.NewForbiddenError("Você não tem permissão para deletar outros usuários.")
+			e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Você não tem permissão para deletar outros usuários.")
 			c.AbortWithStatusJSON(e.Code, e)
 			return
 		}
 
 	default:
-		e := rest_err.NewForbiddenError("Ação não permitida.")
+		e := rest_err.NewForbiddenError(&ctxIdentify.Metadata.RayTraceCode, "Ação não permitida.")
 		c.AbortWithStatusJSON(e.Code, e)
 		return
 	}
@@ -574,11 +571,11 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 	err = ctrl.Service.Delete(c.Request.Context(), targetUser)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			restError := rest_err.NewNotFoundError("user not found")
+			restError := rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "user not found")
 			c.JSON(restError.Code, restError)
 			return
 		}
-		restError := rest_err.NewInternalServerError("internal server error", nil)
+		restError := rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
 		c.JSON(restError.Code, restError)
 		return
 	}

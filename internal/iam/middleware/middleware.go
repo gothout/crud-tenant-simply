@@ -45,7 +45,7 @@ func (mw *impl) SetContextAutorization() gin.HandlerFunc {
 		token := extractBearerToken(authHeader)
 
 		if token == "" {
-			err := rest_err.NewForbiddenError("Token ausente ou inválido.")
+			err := rest_err.NewForbiddenError(nil, "Token ausente ou inválido.")
 			c.Header("X-Request-ID", traceID)
 			c.AbortWithStatusJSON(err.Code, err)
 			return
@@ -56,9 +56,9 @@ func (mw *impl) SetContextAutorization() gin.HandlerFunc {
 		if err != nil {
 			var e *rest_err.RestErr
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				e = rest_err.NewForbiddenError("Token de acesso não encontrado.")
+				e = rest_err.NewForbiddenError(nil, "Token de acesso não encontrado.")
 			} else {
-				e = rest_err.NewForbiddenError("Falha ao validar token de acesso.")
+				e = rest_err.NewForbiddenError(nil, "Falha ao validar token de acesso.")
 			}
 
 			c.Header("X-Request-ID", traceID)
@@ -67,14 +67,14 @@ func (mw *impl) SetContextAutorization() gin.HandlerFunc {
 		}
 
 		if login.AcessToken.UserUUID == nil || *login.AcessToken.UserUUID == uuid.Nil {
-			e := rest_err.NewForbiddenError("Token não associado a nenhum usuário válido.")
+			e := rest_err.NewForbiddenError(nil, "Token não associado a nenhum usuário válido.")
 			c.Header("X-Request-ID", traceID)
 			c.AbortWithStatusJSON(e.Code, e)
 			return
 		}
 
 		if time.Now().UTC().After(login.AcessToken.Expiry) {
-			e := rest_err.NewForbiddenError("Token expirado. Efetue login novamente.")
+			e := rest_err.NewForbiddenError(&login.Metadata.RayTraceCode, "Token expirado. Efetue login novamente.")
 			c.Header("X-Request-ID", traceID)
 			c.AbortWithStatusJSON(e.Code, e)
 			return
@@ -152,7 +152,7 @@ func (mw *impl) AuthorizeRole(requiredRoles ...model.UserRole) gin.HandlerFunc {
 		lUser, ok := GetAuthenticatedUser(c)
 
 		if !ok {
-			e := rest_err.NewForbiddenError("Usuário não autenticado.")
+			e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
 			c.AbortWithStatusJSON(e.Code, e)
 			return
 		}
@@ -162,7 +162,7 @@ func (mw *impl) AuthorizeRole(requiredRoles ...model.UserRole) gin.HandlerFunc {
 			for i, role := range requiredRoles {
 				requiredRoleStrings[i] = string(role)
 			}
-			e := rest_err.NewForbiddenError(fmt.Sprintf(
+			e := rest_err.NewForbiddenError(nil, fmt.Sprintf(
 				"Acesso negado. É necessário possuir uma das permissões: %v.",
 				requiredRoleStrings,
 			))
