@@ -15,6 +15,7 @@ type Repository interface {
 	Create(ctx context.Context, user User) (User, error)
 	Read(ctx context.Context, user User) (User, error)
 	List(ctx context.Context, page, pageSize int) ([]User, error)
+	ListByTenant(ctx context.Context, tenant tenant.Tenant, page, pageSize int) ([]User, error)
 	Update(ctx context.Context, user User) (User, error)
 	Delete(ctx context.Context, user User) error
 }
@@ -85,6 +86,37 @@ func (r *repositoryImpl) List(ctx context.Context, page, pageSize int) ([]User, 
 	if result.Error != nil {
 		return users, result.Error
 	}
+	return users, nil
+}
+
+func (r *repositoryImpl) ListByTenant(ctx context.Context, t tenant.Tenant, page, pageSize int) ([]User, error) {
+	var users []User
+
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+
+	query := r.db.WithContext(ctx).Model(&User{})
+	if t.UUID != uuid.Nil {
+		query = query.Where("tenant_uuid = ?", t.UUID)
+
+	} else if t.Document != "" {
+		query = query.Joins("INNER JOIN tenant ON tenant.uuid = users.tenant_uuid").
+			Where("tenant.document = ?", t.Document)
+
+	} else {
+		return nil, errors.New("é necessário informar o UUID ou o Documento do Tenant")
+	}
+	result := query.Limit(pageSize).Offset(offset).Find(&users)
+
+	if result.Error != nil {
+		return users, result.Error
+	}
+
 	return users, nil
 }
 

@@ -652,7 +652,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retorna uma lista paginada de todos os usuários registrados no sistema.",
+                "description": "Retorna uma lista paginada de usuários.",
                 "produces": [
                     "application/json"
                 ],
@@ -671,6 +671,12 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Tamanho da página (padrão 10)",
                         "name": "size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filtro opcional: UUID ou Documento do Tenant (Apenas para SystemAdmin)",
+                        "name": "tenant_identifier",
                         "in": "query"
                     }
                 ],

@@ -219,6 +219,27 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		userToFind.Email = req.Email
 	}
 
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
+	switch ctxIdentify.User.Role {
+	case model.RoleSystemAdmin:
+		//
+	case model.RoleTenantAdmin:
+		//
+	case model.RoleTenantUser:
+		userToFind.Email = ""
+		userToFind.UUID = ctxIdentify.User.UUID
+	default:
+		e := rest_err.NewForbiddenError("Ação não permitida.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
 	userFound, err := ctrl.Service.Read(c.Request.Context(), userToFind)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -229,6 +250,13 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		restError := rest_err.NewInternalServerError("internal server error", nil)
 		c.JSON(restError.Code, restError)
 		return
+	}
+	if ctxIdentify.User.Role == model.RoleTenantAdmin {
+		if userFound.Tenant.UUID != ctxIdentify.User.Tenant.UUID {
+			e := rest_err.NewForbiddenError("Ação não permitida.")
+			c.AbortWithStatusJSON(e.Code, e)
+			return
+		}
 	}
 
 	response := UserResponseDto{
@@ -245,12 +273,13 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 }
 
 // @Summary      Lista Usuários
-// @Description  Retorna uma lista paginada de todos os usuários registrados no sistema.
+// @Description  Retorna uma lista paginada de usuários.
 // @Tags         User
 // @Produce      json
 // @Security     BearerAuth
-// @Param        page  query     int     false  "Número da página (padrão 1)"
-// @Param        size  query     int     false  "Tamanho da página (padrão 10)"
+// @Param        page              query     int     false  "Número da página (padrão 1)"
+// @Param        size              query     int     false  "Tamanho da página (padrão 10)"
+// @Param        tenant_identifier query     string  false  "Filtro opcional: UUID ou Documento do Tenant (Apenas para SystemAdmin)"
 // @Success      200  {array}   UserResponseDto
 // @Failure      500  {object}  rest_err.RestErr
 // @Router       /api/user/list [get]
@@ -262,8 +291,47 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 		return
 	}
 
-	users, err := ctrl.Service.List(c.Request.Context(), req.Page, req.PageSize)
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
+	var users []User
+	var err error
+	ctx := c.Request.Context()
+
+	switch ctxIdentify.User.Role {
+	case model.RoleSystemAdmin:
+		if req.TenantIdentifier != "" {
+			t := tenant.Tenant{}
+			if errUuid := uuid.Validate(req.TenantIdentifier); errUuid == nil {
+				t.UUID = uuid.MustParse(req.TenantIdentifier)
+			} else {
+				t.Document = req.TenantIdentifier
+			}
+			users, err = ctrl.Service.ListByTenant(ctx, t, req.Page, req.PageSize)
+		} else {
+			users, err = ctrl.Service.List(ctx, req.Page, req.PageSize)
+		}
+
+	case model.RoleTenantAdmin:
+		users, err = ctrl.Service.ListByTenant(ctx, ctxIdentify.User.Tenant, req.Page, req.PageSize)
+
+	default:
+		e := rest_err.NewForbiddenError("Ação não permitida.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
 	if err != nil {
+		if errors.Is(err, tenant.ErrNotFound) {
+			restError := rest_err.NewNotFoundError("tenant not found")
+			c.JSON(restError.Code, restError)
+			return
+		}
+
 		restError := rest_err.NewInternalServerError("internal server error", nil)
 		c.JSON(restError.Code, restError)
 		return
@@ -282,6 +350,11 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 			UpdateAt:   u.UpdateAt,
 		})
 	}
+
+	if response == nil {
+		response = []UserResponseDto{}
+	}
+
 	c.JSON(http.StatusOK, response)
 }
 

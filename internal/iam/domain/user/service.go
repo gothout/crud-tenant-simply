@@ -11,6 +11,7 @@ type Service interface {
 	Create(ctx context.Context, user User) (User, error)
 	Read(ctx context.Context, user User) (User, error)
 	List(ctx context.Context, page, pageSize int) ([]User, error)
+	ListByTenant(ctx context.Context, tenant tenant.Tenant, page, pageSize int) ([]User, error)
 	Update(ctx context.Context, user User) (User, error)
 	Delete(ctx context.Context, user User) error
 }
@@ -55,6 +56,15 @@ func (s *serviceImpl) Read(ctx context.Context, user User) (User, error) {
 
 func (s *serviceImpl) List(ctx context.Context, page, pageSize int) ([]User, error) {
 	return s.Repository.List(ctx, page, pageSize)
+}
+
+func (s *serviceImpl) ListByTenant(ctx context.Context, inputTenant tenant.Tenant, page, pageSize int) ([]User, error) {
+	// Isso garante validação (se o tenant existe) e obtém o UUID se for passado apenas o Documento.
+	t, err := tenant.MustUse().Service.Read(ctx, inputTenant)
+	if err != nil {
+		return nil, err
+	}
+	return s.Repository.ListByTenant(ctx, t, page, pageSize)
 }
 
 func (s *serviceImpl) Update(ctx context.Context, user User) (User, error) {

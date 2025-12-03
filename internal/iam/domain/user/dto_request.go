@@ -20,6 +20,7 @@ type ReadUserRequestDto struct {
 }
 
 type ListUserRequestDto struct {
-	Page     int `form:"page"`
-	PageSize int `form:"size"`
+	Page             int    `form:"page"`
+	PageSize         int    `form:"size"`
+	TenantIdentifier string `form:"tenant_identifier"`
 }

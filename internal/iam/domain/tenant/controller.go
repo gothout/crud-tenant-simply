@@ -235,7 +235,7 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 	if req.PageSize > 100 {
 		restError := rest_err.NewBadRequestError("É permitido um máximo de 100 listagens por página.")
 		c.JSON(restError.Code, restError)
-		return // Adicionado o 'return' para evitar execução posterior
+		return
 	}
 
 	lTenants, err := ctrl.service.List(c.Request.Context(), req.Page, req.PageSize)

@@ -679,8 +679,7 @@ paths:
       - User
   /api/user/list:
     get:
-      description: Retorna uma lista paginada de todos os usuários registrados no
-        sistema.
+      description: Retorna uma lista paginada de usuários.
       parameters:
       - description: Número da página (padrão 1)
         in: query
@@ -690,6 +689,10 @@ paths:
         in: query
         name: size
         type: integer
+      - description: 'Filtro opcional: UUID ou Documento do Tenant (Apenas para SystemAdmin)'
+        in: query
+        name: tenant_identifier
+        type: string
       produces:
       - application/json
       responses:
