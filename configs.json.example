@@ -3,6 +3,12 @@
     "env": "prod",
     "name": "crud-tenant-simply"
   },
+    "log": {
+      "enabled": true,
+      "acess_log": {
+        "enabled": true
+      }
+    },
     "test":{
       "ngrok": {
         "live": false,

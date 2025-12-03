@@ -7,6 +7,7 @@ import (
 	"tenant-crud-simply/internal/iam/middleware"
 	"tenant-crud-simply/internal/pkg/mailer"
 	"tenant-crud-simply/internal/pkg/rest_err"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -238,8 +239,9 @@ func (ctrl *controllerImpl) Healthcheck(c *gin.Context) {
 			CreateAt:   lUser.User.CreateAt,
 			UpdateAt:   lUser.User.UpdateAt,
 		},
-		Token:  lUser.AcessToken.Token,
-		Expire: lUser.AcessToken.Expiry,
+		Token:         lUser.AcessToken.Token,
+		SystemTimeUTC: time.Now().UTC(),
+		Expire:        lUser.AcessToken.Expiry,
 	}
 
 	c.JSON(http.StatusOK, response)

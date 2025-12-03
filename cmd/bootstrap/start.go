@@ -9,6 +9,7 @@ import (
 	"tenant-crud-simply/internal/iam/domain/user"
 	"tenant-crud-simply/internal/iam/middleware"
 	"tenant-crud-simply/internal/infra/jwt"
+	"tenant-crud-simply/internal/pkg/log/acess_log"
 	"tenant-crud-simply/internal/pkg/mailer"
 	"time"
 
@@ -45,6 +46,18 @@ func initIamDomain(db *gorm.DB) {
 
 }
 
+func initLogs(db *gorm.DB) error {
+	configAcessLog := acess_log.Config{
+		LogEnabled: viper.GetBool("log.enabled"),
+		Enabled:    viper.GetBool("log.acess_log.enabled"),
+	}
+	_, err := acess_log.New(db, configAcessLog)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // New prepara a aplicação (config, db, di) e retorna a instância.
 func New() (*Application, error) {
 	Environment()
@@ -76,6 +89,10 @@ func New() (*Application, error) {
 	db := postgres.InitPostgres()
 	log.Println("[BOOTSTRAP-DATABASE] Conexão com o banco de dados inicializada.")
 	initIamDomain(db)
+	err = initLogs(db)
+	if err != nil {
+		log.Println("[BOOTSTRAP-LOG] Falha ao iniciar sistema de logs: %w", err)
+	}
 	log.Println("[BOOTSTRAP-DI] Contêiner de dependências inicializado.")
 
 	return &Application{

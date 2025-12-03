@@ -16,4 +16,19 @@ type AcessToken struct {
 type Login struct {
 	User       model.User
 	AcessToken AcessToken
+	Metadata   Metadata
+}
+
+type Metadata struct {
+	RayTraceCode   string
+	IP             string
+	Agent          string
+	Method         string
+	Path           string
+	Host           string
+	Referer        string
+	ContentType    string
+	UserLanguage   string
+	TimeRequest    time.Time
+	RequestLatency time.Duration
 }
