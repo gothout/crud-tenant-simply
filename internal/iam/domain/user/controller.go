@@ -300,7 +300,6 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 
 	var users []User
 	var err error
-	ctx := c.Request.Context()
 
 	switch ctxIdentify.User.Role {
 	case model.RoleSystemAdmin:
@@ -311,13 +310,13 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 			} else {
 				t.Document = req.TenantIdentifier
 			}
-			users, err = ctrl.Service.ListByTenant(ctx, t, req.Page, req.PageSize)
+			users, err = ctrl.Service.ListByTenant(c, t, req.Page, req.PageSize)
 		} else {
-			users, err = ctrl.Service.List(ctx, req.Page, req.PageSize)
+			users, err = ctrl.Service.List(c, req.Page, req.PageSize)
 		}
 
 	case model.RoleTenantAdmin:
-		users, err = ctrl.Service.ListByTenant(ctx, ctxIdentify.User.Tenant, req.Page, req.PageSize)
+		users, err = ctrl.Service.ListByTenant(c, ctxIdentify.User.Tenant, req.Page, req.PageSize)
 
 	default:
 		e := rest_err.NewForbiddenError("Ação não permitida.")
@@ -359,7 +358,7 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 }
 
 // @Summary      Atualiza um Usuário
-// @Description  Atualiza dados de um usuário existente. O usuário a ser atualizado é identificado pelo UUID no path.
+// @Description  Atualiza dados de um usuário existente. O usuário a ser atualizado é identificado pelo UUID/Email no path.
 // @Tags         User
 // @Accept       json
 // @Produce      json
@@ -374,35 +373,6 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 // @Router       /api/user/{identifier} [patch]
 func (ctrl *controllerImpl) Update(c *gin.Context) {
 	identificador := c.Param("identifier")
-	var userUUID uuid.UUID
-
-	if err := uuid.Validate(identificador); err != nil {
-		rUser, err := ctrl.Service.Read(c.Request.Context(), User{Email: identificador})
-		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				restError := rest_err.NewNotFoundError("user not found")
-				c.JSON(restError.Code, restError)
-				return
-			}
-			restError := rest_err.NewInternalServerError("internal server error", nil)
-			c.JSON(restError.Code, restError)
-			return
-		}
-		userUUID = rUser.UUID
-	} else {
-		userUUID = uuid.MustParse(identificador)
-		_, err := ctrl.Service.Read(c.Request.Context(), User{UUID: userUUID})
-		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				restError := rest_err.NewNotFoundError("user not found")
-				c.JSON(restError.Code, restError)
-				return
-			}
-			restError := rest_err.NewInternalServerError("internal server error", nil)
-			c.JSON(restError.Code, restError)
-			return
-		}
-	}
 
 	var req UpdateUserRequestDto
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -411,20 +381,90 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 		return
 	}
 
-	userToUpdate := User{
-		UUID:     userUUID,
-		Name:     req.Name,
-		Email:    req.Email,
-		Password: req.Password,
-		Role:     req.Role,
+	userToFind := User{}
+	if err := uuid.Validate(identificador); err == nil {
+		userToFind.UUID = uuid.MustParse(identificador)
+	} else {
+		userToFind.Email = identificador
 	}
-	if !IsValidUserRole(userToUpdate.Role) {
-		validRolesStr := strings.Join(AllValidRoles, ", ")
-		restError := rest_err.NewBadRequestError(
-			fmt.Sprintf("invalid user role. Valid roles are: %s", validRolesStr),
-		)
+
+	targetUser, err := ctrl.Service.Read(c.Request.Context(), userToFind)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) || errors.Is(err, tenant.ErrNotFound) {
+			restError := rest_err.NewNotFoundError("user not found")
+			c.JSON(restError.Code, restError)
+			return
+		}
+		restError := rest_err.NewInternalServerError("internal server error", nil)
 		c.JSON(restError.Code, restError)
 		return
+	}
+
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError("Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
+	userToUpdate := User{
+		UUID: targetUser.UUID,
+		Tenant: model.Tenant{
+			UUID: targetUser.Tenant.UUID,
+		},
+	}
+
+	switch ctxIdentify.User.Role {
+	case model.RoleSystemAdmin:
+		userToUpdate.Role = req.Role
+
+	case model.RoleTenantAdmin:
+		if targetUser.TenantUUID.String() != ctxIdentify.User.Tenant.UUID.String() {
+			e := rest_err.NewForbiddenError("Você não tem permissão para alterar usuários de outro tenant.")
+			c.AbortWithStatusJSON(e.Code, e)
+			return
+		}
+		if req.Role != "" {
+			if req.Role == model.RoleSystemAdmin {
+				e := rest_err.NewForbiddenError("Tenant Admin não pode atribuir permissão de System Admin.")
+				c.AbortWithStatusJSON(e.Code, e)
+				return
+			}
+			if req.Role != model.RoleTenantAdmin && req.Role != model.RoleTenantUser {
+				e := rest_err.NewBadRequestError("Role inválida para Tenant Admin.")
+				c.JSON(e.Code, e)
+				return
+			}
+		}
+		userToUpdate.Role = req.Role
+
+	case model.RoleTenantUser:
+		if targetUser.UUID != ctxIdentify.User.UUID {
+			e := rest_err.NewForbiddenError("Você só pode alterar seus próprios dados.")
+			c.AbortWithStatusJSON(e.Code, e)
+			return
+		}
+		userToUpdate.Role = ""
+
+	default:
+		e := rest_err.NewForbiddenError("Ação não permitida.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
+
+	userToUpdate.Name = req.Name
+	userToUpdate.Email = req.Email
+	userToUpdate.Password = req.Password
+
+	if userToUpdate.Role != "" {
+		if !IsValidUserRole(userToUpdate.Role) {
+			validRolesStr := strings.Join(AllValidRoles, ", ")
+			restError := rest_err.NewBadRequestError(
+				fmt.Sprintf("invalid user role. Valid roles are: %s", validRolesStr),
+			)
+			c.JSON(restError.Code, restError)
+			return
+		}
 	}
 
 	updatedUser, err := ctrl.Service.Update(c.Request.Context(), userToUpdate)
@@ -492,11 +532,6 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 	} else {
 		userToDelete.Email = req.Email
 	}
-
-	// First find the user to ensure we have the UUID if only email was provided,
-	// because Repository.Delete might rely on UUID or we want to ensure existence.
-	// Actually Service.Delete calls Repository.Delete which uses UUID.
-	// If we only have Email, we must Read first to get UUID.
 
 	if userToDelete.UUID == uuid.Nil {
 		found, err := ctrl.Service.Read(c.Request.Context(), userToDelete)

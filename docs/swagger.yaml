@@ -589,7 +589,7 @@ paths:
       consumes:
       - application/json
       description: Atualiza dados de um usuário existente. O usuário a ser atualizado
-        é identificado pelo UUID no path.
+        é identificado pelo UUID/Email no path.
       parameters:
       - description: Idenficador do usuário
         in: path

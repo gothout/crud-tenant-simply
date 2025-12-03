@@ -774,7 +774,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Atualiza dados de um usuário existente. O usuário a ser atualizado é identificado pelo UUID no path.",
+                "description": "Atualiza dados de um usuário existente. O usuário a ser atualizado é identificado pelo UUID/Email no path.",
                 "consumes": [
                     "application/json"
                 ],
