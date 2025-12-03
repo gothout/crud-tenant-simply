@@ -34,6 +34,7 @@ certificates/*
 
 # Ignore dir logs
 logs/*
+run/*
 
 # Editor/IDE
 .idea/
