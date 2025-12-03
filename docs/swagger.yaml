@@ -13,6 +13,8 @@ definitions:
     properties:
       expire:
         type: string
+      system_time_utc:
+        type: string
       token:
         type: string
       user:
@@ -57,6 +59,8 @@ definitions:
       error:
         type: string
       message:
+        type: string
+      trace_id:
         type: string
     type: object
   tenant.CreateTenantRequestDto:

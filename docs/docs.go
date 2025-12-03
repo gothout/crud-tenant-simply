@@ -859,6 +859,9 @@ const docTemplate = `{
                 "expire": {
                     "type": "string"
                 },
+                "system_time_utc": {
+                    "type": "string"
+                },
                 "token": {
                     "type": "string"
                 },
@@ -925,6 +928,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "message": {
+                    "type": "string"
+                },
+                "trace_id": {
                     "type": "string"
                 }
             }
