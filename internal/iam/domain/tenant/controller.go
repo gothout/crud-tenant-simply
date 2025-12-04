@@ -106,7 +106,7 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 			"details": err.Error(),
 		}
 		c.JSON(http.StatusBadRequest, response)
-		ctrl.logAudit(c, ctxIdentify, "create", "Create", false, req, response)
+		//ctrl.logAudit(c, ctxIdentify, "create", "Create", false, req, response)
 		return
 	}
 
@@ -119,8 +119,12 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 		UpdateAt: time.Now().UTC(),
 	}
 
-	ctxIdentify, _ := middleware.GetAuthenticatedUser(c)
-
+	ctxIdentify, ok := middleware.GetAuthenticatedUser(c)
+	if !ok {
+		e := rest_err.NewForbiddenError(nil, "Usuário não autenticado.")
+		c.AbortWithStatusJSON(e.Code, e)
+		return
+	}
 	// Chama o serviço para criar
 	created, err := ctrl.service.Create(c.Request.Context(), tenant)
 	if err != nil {
@@ -130,16 +134,14 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 				"error": "document already exists",
 			}
 			c.JSON(http.StatusConflict, response)
-			ctrl.logAudit(c, ctxIdentify, "create", "Create", false, req, response)
 		default:
 			response := gin.H{
 				"error":   "failed to create tenant",
 				"details": err.Error(),
 			}
 			c.JSON(http.StatusInternalServerError, response)
-			ctrl.logAudit(c, ctxIdentify, "create", "Create", false, req, response)
 		}
-		ctrl.logAudit(c, ctxIdentify, "create", "Create", false, err)
+		ctrl.logAudit(c, ctxIdentify, "create", "Create", false, req, err.Error())
 		return
 	}
 
@@ -241,7 +243,7 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao buscar tenant", nil)
 		}
 
-		ctrl.logAudit(c, ctxIdentify, "read", "Read", false, req, restError)
+		ctrl.logAudit(c, ctxIdentify, "read", "Read", false, req, err.Error())
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -255,7 +257,7 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		UpdateAt: rTenant.UpdateAt,
 	}
 	c.JSON(http.StatusOK, resp)
-	ctrl.logAudit(c, ctxIdentify, "read", "Read", true, req, resp)
+	//ctrl.logAudit(c, ctxIdentify, "read", "Read", true, req, resp)
 }
 
 // @Summary      Lista Tenants
@@ -296,7 +298,7 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 	if err != nil {
 		var restError *rest_err.RestErr
 		restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao buscar tenants", nil)
-		ctrl.logAudit(c, ctxIdentify, "list", "List", false, req, restError)
+		ctrl.logAudit(c, ctxIdentify, "list", "List", false, req, err.Error())
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -318,7 +320,7 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 		Size:    req.PageSize,
 	}
 	c.JSON(http.StatusOK, resp)
-	ctrl.logAudit(c, ctxIdentify, "list", "List", true, req, resp)
+	//ctrl.logAudit(c, ctxIdentify, "list", "List", true, req, resp)
 }
 
 // @Summary      Atualiza um Tenant
@@ -404,7 +406,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao atualizar tenant", nil)
 		}
 
-		ctrl.logAudit(c, ctxIdentify, "update", "Update", false, request, restError)
+		ctrl.logAudit(c, ctxIdentify, "update", "Update", false, request, err.Error())
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -483,7 +485,7 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao excluir tenant", nil)
 		}
 
-		ctrl.logAudit(c, ctxIdentify, "delete", "Delete", false, req, restError)
+		ctrl.logAudit(c, ctxIdentify, "delete", "Delete", false, req, err.Error())
 		c.JSON(restError.Code, restError)
 		return
 	}

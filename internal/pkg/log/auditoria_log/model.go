@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type AuditLog struct {
@@ -21,9 +22,14 @@ type AuditLog struct {
 	InputData  string `gorm:"type:text"`
 	OutputData string `gorm:"type:text"`
 
-	CreatedAt time.Time `gorm:"autoCreateTime"`
+	CreatedAt time.Time `gorm:"autoCreateTime:false"`
 }
 
 func (AuditLog) TableName() string {
 	return "audit_log"
+}
+
+func (a *AuditLog) BeforeCreate(tx *gorm.DB) error {
+	a.CreatedAt = time.Now().UTC()
+	return nil
 }

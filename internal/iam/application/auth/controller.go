@@ -134,7 +134,7 @@ func (ctrl *controllerImpl) Login(c *gin.Context) {
 		Action:       "login",
 		Function:     "Login",
 		Success:      true,
-		InputData:    auditoria_log.SerializeData(req),
+		InputData:    auditoria_log.SerializeData(req.Email),
 		OutputData:   auditoria_log.SerializeData(response),
 	})
 
