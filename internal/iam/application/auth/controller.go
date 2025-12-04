@@ -74,7 +74,8 @@ func (ctrl *controllerImpl) Login(c *gin.Context) {
 			Action:       "login",
 			Function:     "Login",
 			Success:      false,
-			ErrorMessage: err.Error(),
+			InputData:    auditoria_log.SerializeData(req),
+			OutputData:   auditoria_log.SerializeData(restErr),
 		})
 		c.JSON(restErr.Code, restErr)
 		return
@@ -101,7 +102,8 @@ func (ctrl *controllerImpl) Login(c *gin.Context) {
 			Action:       "login",
 			Function:     "Login",
 			Success:      false,
-			ErrorMessage: err.Error(),
+			InputData:    auditoria_log.SerializeData(req),
+			OutputData:   auditoria_log.SerializeData(restError),
 		})
 
 		c.JSON(restError.Code, restError)
@@ -132,6 +134,8 @@ func (ctrl *controllerImpl) Login(c *gin.Context) {
 		Action:       "login",
 		Function:     "Login",
 		Success:      true,
+		InputData:    auditoria_log.SerializeData(req),
+		OutputData:   auditoria_log.SerializeData(response),
 	})
 
 	c.JSON(http.StatusOK, response)

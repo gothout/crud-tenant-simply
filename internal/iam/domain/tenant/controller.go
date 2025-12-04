@@ -38,13 +38,12 @@ func NewController(service Service) Controller {
 	}
 }
 
-func (ctrl *controllerImpl) logAudit(c *gin.Context, login *middleware.Login, action, function string, success bool, err error) {
+func (ctrl *controllerImpl) logAudit(c *gin.Context, login *middleware.Login, action, function string, success bool, input, output interface{}) {
 	var (
 		tenantUUID *uuid.UUID
 		userUUID   *uuid.UUID
 		identifier string
 		rayTrace   string
-		errMsg     string
 	)
 
 	if login != nil {
@@ -56,10 +55,6 @@ func (ctrl *controllerImpl) logAudit(c *gin.Context, login *middleware.Login, ac
 		rayTrace = login.Metadata.RayTraceCode
 	}
 
-	if err != nil {
-		errMsg = err.Error()
-	}
-
 	auditoria_log.LogAsync(c.Request.Context(), auditoria_log.AuditLog{
 		TenantUUID:   tenantUUID,
 		UserUUID:     userUUID,
@@ -69,7 +64,8 @@ func (ctrl *controllerImpl) logAudit(c *gin.Context, login *middleware.Login, ac
 		Action:       action,
 		Function:     function,
 		Success:      success,
-		ErrorMessage: errMsg,
+		InputData:    auditoria_log.SerializeData(input),
+		OutputData:   auditoria_log.SerializeData(output),
 	})
 }
 
@@ -102,11 +98,15 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 func (ctrl *controllerImpl) Create(c *gin.Context) {
 	var req CreateTenantRequestDto
 
+	ctxIdentify, _ := middleware.GetAuthenticatedUser(c)
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		response := gin.H{
 			"error":   "invalid request",
 			"details": err.Error(),
-		})
+		}
+		c.JSON(http.StatusBadRequest, response)
+		ctrl.logAudit(c, ctxIdentify, "create", "Create", false, req, response)
 		return
 	}
 
@@ -126,28 +126,33 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 	if err != nil {
 		switch err {
 		case ErrDocumentDuplicated:
-			c.JSON(http.StatusConflict, gin.H{
+			response := gin.H{
 				"error": "document already exists",
-			})
+			}
+			c.JSON(http.StatusConflict, response)
+			ctrl.logAudit(c, ctxIdentify, "create", "Create", false, req, response)
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{
+			response := gin.H{
 				"error":   "failed to create tenant",
 				"details": err.Error(),
-			})
+			}
+			c.JSON(http.StatusInternalServerError, response)
+			ctrl.logAudit(c, ctxIdentify, "create", "Create", false, req, response)
 		}
 		ctrl.logAudit(c, ctxIdentify, "create", "Create", false, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, &TenantResponseDto{
+	resp := &TenantResponseDto{
 		UUID:     created.UUID,
 		Name:     created.Name,
 		Document: created.Document,
 		Live:     created.Live,
 		CreateAt: created.CreateAt,
 		UpdateAt: created.UpdateAt,
-	})
-	ctrl.logAudit(c, ctxIdentify, "create", "Create", true, nil)
+	}
+	c.JSON(http.StatusCreated, resp)
+	ctrl.logAudit(c, ctxIdentify, "create", "Create", true, req, resp)
 }
 
 // @Summary      Busca um Tenant
@@ -236,20 +241,21 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao buscar tenant", nil)
 		}
 
-		ctrl.logAudit(c, ctxIdentify, "read", "Read", false, err)
+		ctrl.logAudit(c, ctxIdentify, "read", "Read", false, req, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
 
-	c.JSON(http.StatusOK, &TenantResponseDto{
+	resp := &TenantResponseDto{
 		UUID:     rTenant.UUID,
 		Name:     rTenant.Name,
 		Document: rTenant.Document,
 		Live:     rTenant.Live,
 		CreateAt: rTenant.CreateAt,
 		UpdateAt: rTenant.UpdateAt,
-	})
-	ctrl.logAudit(c, ctxIdentify, "read", "Read", true, nil)
+	}
+	c.JSON(http.StatusOK, resp)
+	ctrl.logAudit(c, ctxIdentify, "read", "Read", true, req, resp)
 }
 
 // @Summary      Lista Tenants
@@ -290,7 +296,7 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 	if err != nil {
 		var restError *rest_err.RestErr
 		restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao buscar tenants", nil)
-		ctrl.logAudit(c, ctxIdentify, "list", "List", false, err)
+		ctrl.logAudit(c, ctxIdentify, "list", "List", false, req, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -306,12 +312,13 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 			UpdateAt: t.UpdateAt,
 		}
 	}
-	c.JSON(http.StatusOK, &TenantsResponseDto{
+	resp := &TenantsResponseDto{
 		Tenants: tenantResponses,
 		Page:    req.Page,
 		Size:    req.PageSize,
-	})
-	ctrl.logAudit(c, ctxIdentify, "list", "List", true, nil)
+	}
+	c.JSON(http.StatusOK, resp)
+	ctrl.logAudit(c, ctxIdentify, "list", "List", true, req, resp)
 }
 
 // @Summary      Atualiza um Tenant
@@ -397,20 +404,21 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao atualizar tenant", nil)
 		}
 
-		ctrl.logAudit(c, ctxIdentify, "update", "Update", false, err)
+		ctrl.logAudit(c, ctxIdentify, "update", "Update", false, request, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
 
-	c.JSON(http.StatusOK, &TenantResponseDto{
+	resp := &TenantResponseDto{
 		UUID:     tenantUpdated.UUID,
 		Name:     tenantUpdated.Name,
 		Document: tenantUpdated.Document,
 		Live:     tenantUpdated.Live,
 		CreateAt: tenantUpdated.CreateAt,
 		UpdateAt: tenantUpdated.UpdateAt,
-	})
-	ctrl.logAudit(c, ctxIdentify, "update", "Update", true, nil)
+	}
+	c.JSON(http.StatusOK, resp)
+	ctrl.logAudit(c, ctxIdentify, "update", "Update", true, request, resp)
 }
 
 // @Summary      Deleta um model.Tenant
@@ -475,10 +483,10 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao excluir tenant", nil)
 		}
 
-		ctrl.logAudit(c, ctxIdentify, "delete", "Delete", false, err)
+		ctrl.logAudit(c, ctxIdentify, "delete", "Delete", false, req, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
-	ctrl.logAudit(c, ctxIdentify, "delete", "Delete", true, nil)
+	ctrl.logAudit(c, ctxIdentify, "delete", "Delete", true, req, gin.H{"status": "deleted"})
 	c.Status(http.StatusNoContent)
 }
