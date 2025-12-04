@@ -10,6 +10,7 @@ import (
 	"tenant-crud-simply/internal/iam/middleware"
 	"tenant-crud-simply/internal/infra/jwt"
 	"tenant-crud-simply/internal/pkg/log/acess_log"
+	"tenant-crud-simply/internal/pkg/log/auditoria_log"
 	"tenant-crud-simply/internal/pkg/mailer"
 	"time"
 
@@ -55,6 +56,17 @@ func initLogs(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
+
+	configAuditLog := auditoria_log.Config{
+		LogEnabled: viper.GetBool("log.enabled"),
+		Enabled:    viper.GetBool("log.auditoria_log.enabled"),
+	}
+
+	_, err = auditoria_log.New(db, configAuditLog)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

@@ -7,6 +7,9 @@
       "enabled": true,
       "acess_log": {
         "enabled": true
+      },
+      "auditoria_log": {
+        "enabled": true
       }
     },
     "test":{
