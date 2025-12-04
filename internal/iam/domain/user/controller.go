@@ -8,6 +8,7 @@ import (
 	"tenant-crud-simply/internal/iam/domain/model"
 	"tenant-crud-simply/internal/iam/domain/tenant"
 	"tenant-crud-simply/internal/iam/middleware"
+	"tenant-crud-simply/internal/pkg/log/auditoria_log"
 	"tenant-crud-simply/internal/pkg/rest_err"
 
 	"github.com/gin-gonic/gin"
@@ -34,6 +35,37 @@ func NewController(service Service) Controller {
 		Service: service,
 		mw:      mw,
 	}
+}
+
+func (ctrl *controllerImpl) logAudit(c *gin.Context, login *middleware.Login, action, function string, success bool, input, output interface{}) {
+	var (
+		tenantUUID *uuid.UUID
+		userUUID   *uuid.UUID
+		identifier string
+		rayTrace   string
+	)
+
+	if login != nil {
+		tenantUUID = login.User.TenantUUID
+		if login.User.UUID != uuid.Nil {
+			userUUID = &login.User.UUID
+		}
+		identifier = login.User.Email
+		rayTrace = login.Metadata.RayTraceCode
+	}
+
+	auditoria_log.LogAsync(c.Request.Context(), auditoria_log.AuditLog{
+		TenantUUID:   tenantUUID,
+		UserUUID:     userUUID,
+		Identifier:   identifier,
+		RayTraceCode: rayTrace,
+		Domain:       "user",
+		Action:       action,
+		Function:     function,
+		Success:      success,
+		InputData:    auditoria_log.SerializeData(input),
+		OutputData:   auditoria_log.SerializeData(output),
+	})
 }
 
 func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
@@ -165,6 +197,7 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
 		}
 
+		ctrl.logAudit(c, ctxIdentify, "create", "Create", false, map[string]interface{}{"tenantIdentifier": tenantIdentifier, "request": req}, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -179,6 +212,7 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 		CreateAt:   userCreated.CreateAt,
 		UpdateAt:   userCreated.UpdateAt,
 	}
+	ctrl.logAudit(c, ctxIdentify, "create", "Create", true, map[string]interface{}{"tenantIdentifier": tenantIdentifier, "request": req}, response)
 	c.JSON(http.StatusCreated, response)
 }
 
@@ -224,10 +258,12 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrNotFound) || errors.Is(err, tenant.ErrNotFound) {
 			restError := rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "user not found")
+			ctrl.logAudit(c, ctxIdentify, "read", "Read", false, map[string]interface{}{"identifier": identificador}, restError)
 			c.JSON(restError.Code, restError)
 			return
 		}
 		restError := rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
+		ctrl.logAudit(c, ctxIdentify, "read", "Read", false, map[string]interface{}{"identifier": identificador}, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -269,6 +305,7 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		CreateAt:   userFound.CreateAt,
 		UpdateAt:   userFound.UpdateAt,
 	}
+	ctrl.logAudit(c, ctxIdentify, "read", "Read", true, map[string]interface{}{"identifier": identificador}, response)
 	c.JSON(http.StatusOK, response)
 }
 
@@ -327,11 +364,13 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, tenant.ErrNotFound) {
 			restError := rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "tenant not found")
+			ctrl.logAudit(c, ctxIdentify, "list", "List", false, req, restError)
 			c.JSON(restError.Code, restError)
 			return
 		}
 
 		restError := rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
+		ctrl.logAudit(c, ctxIdentify, "list", "List", false, req, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -354,6 +393,7 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 		response = []UserResponseDto{}
 	}
 
+	ctrl.logAudit(c, ctxIdentify, "list", "List", true, req, response)
 	c.JSON(http.StatusOK, response)
 }
 
@@ -398,10 +438,12 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrNotFound) || errors.Is(err, tenant.ErrNotFound) {
 			restError := rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "user not found")
+			ctrl.logAudit(c, ctxIdentify, "update", "Update", false, map[string]interface{}{"identifier": identificador, "request": req}, restError)
 			c.JSON(restError.Code, restError)
 			return
 		}
 		restError := rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
+		ctrl.logAudit(c, ctxIdentify, "update", "Update", false, map[string]interface{}{"identifier": identificador, "request": req}, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -477,6 +519,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 		default:
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
 		}
+		ctrl.logAudit(c, ctxIdentify, "update", "Update", false, map[string]interface{}{"identifier": identificador, "request": req}, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -491,6 +534,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 		CreateAt:   updatedUser.CreateAt,
 		UpdateAt:   updatedUser.UpdateAt,
 	}
+	ctrl.logAudit(c, ctxIdentify, "update", "Update", true, map[string]interface{}{"identifier": identificador, "request": req}, response)
 	c.JSON(http.StatusOK, response)
 }
 
@@ -533,10 +577,12 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrNotFound) || errors.Is(err, tenant.ErrNotFound) {
 			restError := rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "user not found")
+			ctrl.logAudit(c, ctxIdentify, "delete", "Delete", false, map[string]interface{}{"identifier": identificador}, restError)
 			c.JSON(restError.Code, restError)
 			return
 		}
 		restError := rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
+		ctrl.logAudit(c, ctxIdentify, "delete", "Delete", false, map[string]interface{}{"identifier": identificador}, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -572,13 +618,16 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			restError := rest_err.NewNotFoundError(&ctxIdentify.Metadata.RayTraceCode, "user not found")
+			ctrl.logAudit(c, ctxIdentify, "delete", "Delete", false, map[string]interface{}{"identifier": identificador}, restError)
 			c.JSON(restError.Code, restError)
 			return
 		}
 		restError := rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "internal server error", nil)
+		ctrl.logAudit(c, ctxIdentify, "delete", "Delete", false, map[string]interface{}{"identifier": identificador}, restError)
 		c.JSON(restError.Code, restError)
 		return
 	}
 
+	ctrl.logAudit(c, ctxIdentify, "delete", "Delete", true, map[string]interface{}{"identifier": identificador}, gin.H{"status": "deleted"})
 	c.Status(http.StatusNoContent)
 }

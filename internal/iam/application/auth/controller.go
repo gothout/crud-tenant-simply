@@ -5,11 +5,13 @@ import (
 	"net/http"
 	"tenant-crud-simply/internal/iam/domain/user"
 	"tenant-crud-simply/internal/iam/middleware"
+	"tenant-crud-simply/internal/pkg/log/auditoria_log"
 	"tenant-crud-simply/internal/pkg/mailer"
 	"tenant-crud-simply/internal/pkg/rest_err"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type Controller interface {
@@ -56,9 +58,25 @@ func (ctrl *controllerImpl) Routes(routes gin.IRouter) {
 // @Failure 500 {object} rest_err.RestErr "Erro interno do servidor"
 // @Router /api/auth/login [post]
 func (ctrl *controllerImpl) Login(c *gin.Context) {
+	traceID := c.GetHeader("X-Request-ID")
+	if traceID == "" {
+		traceID = uuid.NewString()
+	}
+	c.Header("X-Request-ID", traceID)
+
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		restErr := rest_err.NewBadRequestError(nil, "invalid json body")
+		auditoria_log.LogAsync(c.Request.Context(), auditoria_log.AuditLog{
+			Identifier:   req.Email,
+			RayTraceCode: traceID,
+			Domain:       "auth",
+			Action:       "login",
+			Function:     "Login",
+			Success:      false,
+			InputData:    auditoria_log.SerializeData(req),
+			OutputData:   auditoria_log.SerializeData(restErr),
+		})
 		c.JSON(restErr.Code, restErr)
 		return
 	}
@@ -76,6 +94,17 @@ func (ctrl *controllerImpl) Login(c *gin.Context) {
 		default:
 			restError = rest_err.NewInternalServerError(nil, "internal server error", nil)
 		}
+
+		auditoria_log.LogAsync(c.Request.Context(), auditoria_log.AuditLog{
+			Identifier:   req.Email,
+			RayTraceCode: traceID,
+			Domain:       "auth",
+			Action:       "login",
+			Function:     "Login",
+			Success:      false,
+			InputData:    auditoria_log.SerializeData(req),
+			OutputData:   auditoria_log.SerializeData(restError),
+		})
 
 		c.JSON(restError.Code, restError)
 		return
@@ -95,6 +124,19 @@ func (ctrl *controllerImpl) Login(c *gin.Context) {
 		Token:  uLogin.AcessToken.Token,
 		Expire: uLogin.AcessToken.Expiry,
 	}
+
+	auditoria_log.LogAsync(c.Request.Context(), auditoria_log.AuditLog{
+		TenantUUID:   uLogin.User.TenantUUID,
+		UserUUID:     &uLogin.User.UUID,
+		Identifier:   uLogin.User.Email,
+		RayTraceCode: traceID,
+		Domain:       "auth",
+		Action:       "login",
+		Function:     "Login",
+		Success:      true,
+		InputData:    auditoria_log.SerializeData(req),
+		OutputData:   auditoria_log.SerializeData(response),
+	})
 
 	c.JSON(http.StatusOK, response)
 }
