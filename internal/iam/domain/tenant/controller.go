@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"tenant-crud-simply/internal/iam/domain/model"
 	"tenant-crud-simply/internal/iam/middleware"
+	"tenant-crud-simply/internal/pkg/log/auditoria_log"
 	"tenant-crud-simply/internal/pkg/rest_err"
 	"time"
 
@@ -35,6 +36,41 @@ func NewController(service Service) Controller {
 		service: service,
 		mw:      mw,
 	}
+}
+
+func (ctrl *controllerImpl) logAudit(c *gin.Context, login *middleware.Login, action, function string, success bool, err error) {
+	var (
+		tenantUUID *uuid.UUID
+		userUUID   *uuid.UUID
+		identifier string
+		rayTrace   string
+		errMsg     string
+	)
+
+	if login != nil {
+		tenantUUID = login.User.TenantUUID
+		if login.User.UUID != uuid.Nil {
+			userUUID = &login.User.UUID
+		}
+		identifier = login.User.Email
+		rayTrace = login.Metadata.RayTraceCode
+	}
+
+	if err != nil {
+		errMsg = err.Error()
+	}
+
+	auditoria_log.LogAsync(c.Request.Context(), auditoria_log.AuditLog{
+		TenantUUID:   tenantUUID,
+		UserUUID:     userUUID,
+		Identifier:   identifier,
+		RayTraceCode: rayTrace,
+		Domain:       "tenant",
+		Action:       action,
+		Function:     function,
+		Success:      success,
+		ErrorMessage: errMsg,
+	})
 }
 
 // Routes registra as rotas do tenant
@@ -83,6 +119,8 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 		UpdateAt: time.Now().UTC(),
 	}
 
+	ctxIdentify, _ := middleware.GetAuthenticatedUser(c)
+
 	// Chama o serviço para criar
 	created, err := ctrl.service.Create(c.Request.Context(), tenant)
 	if err != nil {
@@ -97,6 +135,7 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 				"details": err.Error(),
 			})
 		}
+		ctrl.logAudit(c, ctxIdentify, "create", "Create", false, err)
 		return
 	}
 
@@ -108,6 +147,7 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 		CreateAt: created.CreateAt,
 		UpdateAt: created.UpdateAt,
 	})
+	ctrl.logAudit(c, ctxIdentify, "create", "Create", true, nil)
 }
 
 // @Summary      Busca um Tenant
@@ -196,6 +236,7 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao buscar tenant", nil)
 		}
 
+		ctrl.logAudit(c, ctxIdentify, "read", "Read", false, err)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -208,6 +249,7 @@ func (ctrl *controllerImpl) Read(c *gin.Context) {
 		CreateAt: rTenant.CreateAt,
 		UpdateAt: rTenant.UpdateAt,
 	})
+	ctrl.logAudit(c, ctxIdentify, "read", "Read", true, nil)
 }
 
 // @Summary      Lista Tenants
@@ -248,6 +290,7 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 	if err != nil {
 		var restError *rest_err.RestErr
 		restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao buscar tenants", nil)
+		ctrl.logAudit(c, ctxIdentify, "list", "List", false, err)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -268,6 +311,7 @@ func (ctrl *controllerImpl) List(c *gin.Context) {
 		Page:    req.Page,
 		Size:    req.PageSize,
 	})
+	ctrl.logAudit(c, ctxIdentify, "list", "List", true, nil)
 }
 
 // @Summary      Atualiza um Tenant
@@ -353,6 +397,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao atualizar tenant", nil)
 		}
 
+		ctrl.logAudit(c, ctxIdentify, "update", "Update", false, err)
 		c.JSON(restError.Code, restError)
 		return
 	}
@@ -365,6 +410,7 @@ func (ctrl *controllerImpl) Update(c *gin.Context) {
 		CreateAt: tenantUpdated.CreateAt,
 		UpdateAt: tenantUpdated.UpdateAt,
 	})
+	ctrl.logAudit(c, ctxIdentify, "update", "Update", true, nil)
 }
 
 // @Summary      Deleta um model.Tenant
@@ -429,8 +475,10 @@ func (ctrl *controllerImpl) Delete(c *gin.Context) {
 			restError = rest_err.NewInternalServerError(&ctxIdentify.Metadata.RayTraceCode, "Falha ao excluir tenant", nil)
 		}
 
+		ctrl.logAudit(c, ctxIdentify, "delete", "Delete", false, err)
 		c.JSON(restError.Code, restError)
 		return
 	}
+	ctrl.logAudit(c, ctxIdentify, "delete", "Delete", true, nil)
 	c.Status(http.StatusNoContent)
 }
