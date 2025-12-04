@@ -119,6 +119,8 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 		UpdateAt: time.Now().UTC(),
 	}
 
+	ctxIdentify, _ := middleware.GetAuthenticatedUser(c)
+
 	// Chama o serviço para criar
 	created, err := ctrl.service.Create(c.Request.Context(), tenant)
 	if err != nil {
@@ -137,6 +139,7 @@ func (ctrl *controllerImpl) Create(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, response)
 			ctrl.logAudit(c, ctxIdentify, "create", "Create", false, req, response)
 		}
+		ctrl.logAudit(c, ctxIdentify, "create", "Create", false, err)
 		return
 	}
 
